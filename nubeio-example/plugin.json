@@ -1,0 +1,17 @@
+{
+  "id": "nube.example",
+  "vendor": "nube",
+  "name": "example",
+  "displayName": "Example Plugin",
+  "version": "1.0.0",
+  "description": "Example plugin for Nube.io platform",
+  "nodeTypes": ["nube.trigger"],
+  "category": "Example",
+  "execPath": "./example",
+  "args": [
+    "--log", "info"
+  ],
+  "icon": "folder",
+  "tags": ["test", "hello-world", "example"],
+  "color": "#2196F3"
+}
