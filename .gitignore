@@ -41,3 +41,9 @@ __debug_bin
 # Temporary files
 *.tmp
 *.log
+nubeio-example/example
+
+# Frontend dependencies
+nubeio-example/frontend/node_modules
+nubeio-example/frontend/.__mf__temp
+nubeio-example/dist-frontend

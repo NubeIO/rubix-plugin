@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -15,66 +16,128 @@ import (
 )
 
 // ============================================================
-// TriggerNode — toggles true/false on a configurable interval
-// Mirrors examples/plugin-counter TriggerNode using rubix-plugin types
+// ExampleNode — demonstrates inputs, outputs, and all port types.
+//
+// Inputs (1):
+//   in_multiplier  number   — multiplied against the counter each tick (default 1)
+//
+// Outputs (3):
+//   out_toggle     bool     — alternates true/false on every tick
+//   out_count      number   — tick counter × multiplier
+//   out_message    string   — human-readable status line
 // ============================================================
 
-type TriggerNode struct {
+type ExampleNode struct {
+	mu       sync.Mutex
 	id       string
 	settings map[string]interface{}
-	outputs  []pluginnode.NodePort
 	log      zerolog.Logger
 
-	emitCtx     *pluginnode.EmitContext
-	ticker      *time.Ticker
-	cancel      context.CancelFunc
-	done        chan struct{}
-	toggleState bool
+	// input state (updated via OnInputUpdated / Process)
+	multiplier float64
+
+	// output state
+	toggle  bool
+	counter float64
+
+	// emitting
+	ticker *time.Ticker
+	cancel context.CancelFunc
+	done   chan struct{}
 }
 
-func (n *TriggerNode) Init(spec pluginnode.NodeSpec) error {
+func (n *ExampleNode) Init(spec pluginnode.NodeSpec) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	n.id = spec.ID
 	n.settings = spec.Settings
-	n.outputs = []pluginnode.NodePort{
-		{
-			Handle: "trigger",
-			Name:   "Trigger",
-			Kind:   "output",
-			Type:   "bool",
-		},
-	}
-	n.log.Info().Str("nodeId", spec.ID).Msg("trigger node initialized")
+	n.multiplier = 1.0 // default
+	n.log.Info().Str("nodeId", spec.ID).Msg("example node initialized")
 	return nil
 }
 
-func (n *TriggerNode) Close() error {
+func (n *ExampleNode) Close() error {
 	if n.cancel != nil {
 		n.StopEmitting()
 	}
-	n.log.Info().Str("nodeId", n.id).Msg("trigger node closed")
+	n.log.Info().Str("nodeId", n.id).Msg("example node closed")
 	return nil
 }
 
-func (n *TriggerNode) GetPorts() ([]pluginnode.NodePort, []pluginnode.NodePort) {
-	return nil, n.outputs
+func (n *ExampleNode) GetPorts() (inputs []pluginnode.NodePort, outputs []pluginnode.NodePort) {
+	inputs = []pluginnode.NodePort{
+		{
+			Handle:      "in_multiplier",
+			Name:        "Multiplier",
+			Kind:        "input",
+			Type:        "number",
+			Description: "Multiplied against the counter on every tick (default 1)",
+		},
+	}
+	outputs = []pluginnode.NodePort{
+		{
+			Handle:      "out_toggle",
+			Name:        "Toggle",
+			Kind:        "output",
+			Type:        "bool",
+			Description: "Alternates true/false on every tick",
+		},
+		{
+			Handle:      "out_count",
+			Name:        "Count",
+			Kind:        "output",
+			Type:        "number",
+			Description: "Tick counter × multiplier",
+		},
+		{
+			Handle:      "out_message",
+			Name:        "Message",
+			Kind:        "output",
+			Type:        "string",
+			Description: "Human-readable status line",
+		},
+	}
+	return inputs, outputs
 }
 
-func (n *TriggerNode) OnInputUpdated(_ string, _ pluginnode.PortValue) {}
+// OnInputUpdated is called whenever an upstream node writes to one of our inputs.
+func (n *ExampleNode) OnInputUpdated(portID string, val pluginnode.PortValue) {
+	if portID == "in_multiplier" && val.ValueNum != nil {
+		n.mu.Lock()
+		n.multiplier = *val.ValueNum
+		n.mu.Unlock()
+		n.log.Debug().Str("nodeId", n.id).Float64("multiplier", *val.ValueNum).Msg("multiplier updated")
+	}
+}
 
-func (n *TriggerNode) Process(_ context.Context, _ map[string]pluginnode.PortValue) (map[string]pluginnode.PortValue, error) {
+// Process is called when rubix wants the current output values (e.g. on graph eval).
+func (n *ExampleNode) Process(_ context.Context, inputs map[string]pluginnode.PortValue) (map[string]pluginnode.PortValue, error) {
+	if v, ok := inputs["in_multiplier"]; ok && v.ValueNum != nil {
+		n.mu.Lock()
+		n.multiplier = *v.ValueNum
+		n.mu.Unlock()
+	}
+	n.mu.Lock()
+	toggle := n.toggle
+	count := n.counter * n.multiplier
+	msg := fmt.Sprintf("tick %.0f — toggle=%v count=%.2f", n.counter, toggle, count)
+	n.mu.Unlock()
+
 	return map[string]pluginnode.PortValue{
-		"trigger": pluginnode.BoolVal(n.toggleState),
+		"out_toggle":  pluginnode.BoolVal(toggle),
+		"out_count":   pluginnode.NumberVal(count),
+		"out_message": pluginnode.StrVal(msg),
 	}, nil
 }
 
-func (n *TriggerNode) SettingsSchema() map[string]interface{} {
+func (n *ExampleNode) SettingsSchema() map[string]interface{} {
 	return map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
 			"interval": map[string]interface{}{
 				"type":        "number",
 				"title":       "Interval (ms)",
-				"description": "Time between trigger emissions in milliseconds",
+				"description": "Time between tick emissions in milliseconds",
 				"default":     5000,
 				"minimum":     100,
 			},
@@ -83,12 +146,11 @@ func (n *TriggerNode) SettingsSchema() map[string]interface{} {
 }
 
 // StartEmitting starts the background ticker — implements EmittingNode.
-func (n *TriggerNode) StartEmitting(ctx pluginnode.EmitContext) error {
-	n.emitCtx = &ctx
+func (n *ExampleNode) StartEmitting(ctx pluginnode.EmitContext) error {
 	n.done = make(chan struct{})
 
 	interval := 5 * time.Second
-	if v, ok := n.settings["interval"].(float64); ok {
+	if v, ok := n.settings["interval"].(float64); ok && v >= 100 {
 		interval = time.Duration(v) * time.Millisecond
 	}
 
@@ -98,27 +160,42 @@ func (n *TriggerNode) StartEmitting(ctx pluginnode.EmitContext) error {
 
 	go func() {
 		defer close(n.done)
-		n.log.Info().Str("nodeId", n.id).Dur("interval", interval).Msg("started autonomous emissions")
+		n.log.Info().Str("nodeId", n.id).Dur("interval", interval).Msg("started emissions")
 		for {
 			select {
 			case <-emitCtx.Done():
-				n.log.Info().Str("nodeId", n.id).Msg("stopped autonomous emissions")
+				n.log.Info().Str("nodeId", n.id).Msg("stopped emissions")
 				return
 			case <-n.ticker.C:
-				n.toggleState = !n.toggleState
-				if err := ctx.Emit("trigger", pluginnode.BoolVal(n.toggleState)); err != nil {
-					n.log.Error().Err(err).Msg("failed to emit trigger")
-				} else {
-					n.log.Info().Str("nodeId", n.id).Bool("value", n.toggleState).Msg("→ emitted trigger")
-				}
+				n.mu.Lock()
+				n.toggle = !n.toggle
+				n.counter++
+				toggle := n.toggle
+				count := n.counter * n.multiplier
+				msg := fmt.Sprintf("tick %.0f — toggle=%v count=%.2f", n.counter, toggle, count)
+				n.mu.Unlock()
+
+				emitAll(ctx, n.log, n.id, toggle, count, msg)
 			}
 		}
 	}()
 	return nil
 }
 
+func emitAll(ctx pluginnode.EmitContext, log zerolog.Logger, nodeID string, toggle bool, count float64, msg string) {
+	emit := func(port string, val pluginnode.PortValue) {
+		if err := ctx.Emit(port, val); err != nil {
+			log.Error().Err(err).Str("port", port).Msg("emit failed")
+		}
+	}
+	emit("out_toggle", pluginnode.BoolVal(toggle))
+	emit("out_count", pluginnode.NumberVal(count))
+	emit("out_message", pluginnode.StrVal(msg))
+	log.Info().Str("nodeId", nodeID).Bool("toggle", toggle).Float64("count", count).Str("msg", msg).Msg("→ tick")
+}
+
 // StopEmitting stops the background ticker — implements EmittingNode.
-func (n *TriggerNode) StopEmitting() error {
+func (n *ExampleNode) StopEmitting() error {
 	if n.cancel != nil {
 		n.cancel()
 		n.cancel = nil
@@ -141,8 +218,8 @@ func (n *TriggerNode) StopEmitting() error {
 
 func nodeFactory(nodeType string) pluginnode.PluginNode {
 	switch nodeType {
-	case "nube.trigger":
-		return &TriggerNode{}
+	case "nube.example":
+		return &ExampleNode{multiplier: 1.0}
 	default:
 		return nil
 	}
@@ -158,7 +235,7 @@ func main() {
 	deviceID := flag.String("device", "device0", "Device ID")
 	prefix := flag.String("prefix", "rubix.v1.local", "NATS subject prefix")
 	vendor := flag.String("vendor", "nube", "Plugin vendor")
-	pluginName := flag.String("name", "projectmgmt", "Plugin name")
+	pluginName := flag.String("name", "example", "Plugin name")
 	logLevel := flag.String("log", "info", "Log level (debug/info/warn/error)")
 	flag.Parse()
 
@@ -205,15 +282,15 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
+	heartbeat := time.NewTicker(30 * time.Second)
+	defer heartbeat.Stop()
 
 	for {
 		select {
 		case <-sigCh:
 			logger.Info().Msg("shutdown signal received")
 			return
-		case <-ticker.C:
+		case <-heartbeat.C:
 			logger.Debug().Msg("heartbeat")
 		}
 	}

@@ -5,7 +5,7 @@
   "displayName": "Example Plugin",
   "version": "1.0.0",
   "description": "Example plugin for Nube.io platform",
-  "nodeTypes": ["nube.trigger"],
+  "nodeTypes": ["nube.example"],
   "category": "Example",
   "execPath": "./example",
   "args": [
@@ -13,5 +13,16 @@
   ],
   "icon": "folder",
   "tags": ["test", "hello-world", "example"],
-  "color": "#2196F3"
+  "color": "#2196F3",
+  "pages": [
+    {
+      "pageId": "example-ui",
+      "title": "Example Plugin UI",
+      "enabled": true,
+      "order": 10,
+      "props": {
+        "exposedPath": "./Page"
+      }
+    }
+  ]
 }
