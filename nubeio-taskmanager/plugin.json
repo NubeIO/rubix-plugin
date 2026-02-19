@@ -1,0 +1,23 @@
+{
+  "id": "nube.taskmanager",
+  "vendor": "nube",
+  "name": "taskmanager",
+  "displayName": "Task Manager",
+  "version": "1.0.0",
+  "description": "Projects and tasks with live flow runtime stats",
+  "nodeTypes": ["nube.taskmanager"],
+  "category": "Management",
+  "execPath": "./taskmanager",
+  "args": ["--log", "info"],
+  "pages": [
+    {
+      "pageId": "taskmanager-ui",
+      "title": "Task Manager",
+      "enabled": true,
+      "order": 10,
+      "props": {
+        "exposedPath": "./Page"
+      }
+    }
+  ]
+}

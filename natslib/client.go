@@ -1,6 +1,10 @@
 package natslib
 
-import "github.com/nats-io/nats.go"
+import (
+	"time"
+
+	"github.com/nats-io/nats.go"
+)
 
 // Client is a thin wrapper around a NATS connection.
 type Client struct {
@@ -24,6 +28,15 @@ func (c *Client) SubscribeMsg(subject string, handler nats.MsgHandler) (*nats.Su
 // Publish sends data to a subject.
 func (c *Client) Publish(subject string, data []byte) error {
 	return c.conn.Publish(subject, data)
+}
+
+// Request sends a request and waits for a reply up to timeout.
+func (c *Client) Request(subject string, data []byte, timeout time.Duration) ([]byte, error) {
+	msg, err := c.conn.Request(subject, data, timeout)
+	if err != nil {
+		return nil, err
+	}
+	return msg.Data, nil
 }
 
 // Close closes the NATS connection.

@@ -47,3 +47,5 @@ nubeio-example/example
 nubeio-example/frontend/node_modules
 nubeio-example/frontend/.__mf__temp
 nubeio-example/dist-frontend
+nubeio-taskmanager/frontend/node_modules
+nubeio-taskmanager/dist-frontend

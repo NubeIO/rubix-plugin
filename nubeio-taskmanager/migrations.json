@@ -1,0 +1,15 @@
+{
+  "pluginId": "nube.taskmanager",
+  "migrations": [
+    {
+      "version": 1,
+      "description": "Create projects table",
+      "up": "CREATE TABLE IF NOT EXISTS nube_taskmanager_projects ( id INTEGER PRIMARY KEY AUTOINCREMENT, org_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'active', created_at DATETIME NOT NULL DEFAULT (datetime('now')), updated_at DATETIME NOT NULL DEFAULT (datetime('now')) ); CREATE INDEX IF NOT EXISTS idx_ntm_projects_org ON nube_taskmanager_projects(org_id);"
+    },
+    {
+      "version": 2,
+      "description": "Create tasks table",
+      "up": "CREATE TABLE IF NOT EXISTS nube_taskmanager_tasks ( id INTEGER PRIMARY KEY AUTOINCREMENT, org_id TEXT NOT NULL, project_id INTEGER NOT NULL DEFAULT 0, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'todo', priority TEXT NOT NULL DEFAULT 'medium', assigned_user_id TEXT NOT NULL DEFAULT '', assigned_user_name TEXT NOT NULL DEFAULT '', due_date DATETIME, created_at DATETIME NOT NULL DEFAULT (datetime('now')), updated_at DATETIME NOT NULL DEFAULT (datetime('now')) ); CREATE INDEX IF NOT EXISTS idx_ntm_tasks_org ON nube_taskmanager_tasks(org_id); CREATE INDEX IF NOT EXISTS idx_ntm_tasks_project ON nube_taskmanager_tasks(org_id, project_id); CREATE INDEX IF NOT EXISTS idx_ntm_tasks_status ON nube_taskmanager_tasks(org_id, status);"
+    }
+  ]
+}
