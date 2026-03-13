@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/NubeIO/rubix-plugin/natslib"
+	"github.com/nats-io/nats.go"
 )
 
 const defaultTimeout = 10 * time.Second
@@ -184,4 +185,23 @@ func (c *Client) doRow(subject string, payload interface{}) (map[string]interfac
 		return nil, fmt.Errorf("unmarshal row: %w", err)
 	}
 	return row, nil
+}
+
+// --- Reactive updates ---
+
+// SubjectPrefix returns the NATS subject prefix for this client's plugindata operations.
+// Format: {prefix}.{orgId}.{deviceId}
+func (c *Client) SubjectPrefix() string {
+	return fmt.Sprintf("%s.%s.%s", c.prefix, c.orgID, c.deviceID)
+}
+
+// SubscribeToDataChanges subscribes to data change notifications from rubix.
+// The callback is invoked whenever insert/update/delete operations occur on plugin tables.
+// Subject format: {prefix}.{orgId}.{deviceId}.plugindata.{vendor}.{name}.changed
+func (c *Client) SubscribeToDataChanges(subject string, callback func()) error {
+	_, err := c.nc.SubscribeMsg(subject, func(msg *nats.Msg) {
+		// Notification received - invoke callback
+		callback()
+	})
+	return err
 }

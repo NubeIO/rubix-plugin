@@ -4,7 +4,7 @@
 // Ports:
 //
 //	Input:  refresh_interval (number, seconds, default 30, min 5)
-//	Output: project_count, task_count, active_count, completed_count, overdue_count
+//	Output: project_count, task_count, active_count, completed_count, overdue_count, heartbeat, last_update
 package node
 
 import (
@@ -26,9 +26,12 @@ type TaskManagerNode struct {
 	refreshInterval time.Duration
 
 	// emitting state
-	cancel context.CancelFunc
-	done   chan struct{}
-	ticker *time.Ticker
+	cancel          context.CancelFunc
+	done            chan struct{}
+	ticker          *time.Ticker
+	heartbeatTicker *time.Ticker
+	heartbeatCount  int64
+	refreshTrigger  chan struct{} // Triggered by NATS data change notifications
 }
 
 // NewTaskManagerNode returns a factory-created node pre-wired with the datastore client.
@@ -65,11 +68,13 @@ func (n *TaskManagerNode) GetPorts() (inputs []pluginnode.NodePort, outputs []pl
 		},
 	}
 	outputs = []pluginnode.NodePort{
-		{Handle: "project_count", Name: "Project Count", Kind: "output", Type: "number"},
-		{Handle: "task_count", Name: "Task Count", Kind: "output", Type: "number"},
-		{Handle: "active_count", Name: "Active Tasks", Kind: "output", Type: "number"},
-		{Handle: "completed_count", Name: "Completed Tasks", Kind: "output", Type: "number"},
-		{Handle: "overdue_count", Name: "Overdue Tasks", Kind: "output", Type: "number"},
+		{Handle: "project_count", Name: "Project Count", Kind: "output", Type: "number", Persist: true},
+		{Handle: "task_count", Name: "Task Count", Kind: "output", Type: "number", Persist: true},
+		{Handle: "active_count", Name: "Active Tasks", Kind: "output", Type: "number", Persist: true},
+		{Handle: "completed_count", Name: "Completed Tasks", Kind: "output", Type: "number", Persist: true},
+		{Handle: "overdue_count", Name: "Overdue Tasks", Kind: "output", Type: "number", Persist: true},
+		{Handle: "heartbeat", Name: "Heartbeat", Kind: "output", Type: "number", Persist: false, Description: "Increments every 15 seconds (WebSocket test)"},
+		{Handle: "last_update", Name: "Last Update", Kind: "output", Type: "string", Persist: true, Description: "ISO timestamp of last emission"},
 	}
 	return inputs, outputs
 }
@@ -117,22 +122,104 @@ func (n *TaskManagerNode) SettingsSchema() map[string]interface{} {
 func (n *TaskManagerNode) StartEmitting(ctx pluginnode.EmitContext) error {
 	emitCtx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
+	refreshTrigger := make(chan struct{}, 10) // Buffered to prevent blocking
 
 	n.mu.Lock()
 	n.cancel = cancel
 	n.done = done
+	n.refreshTrigger = refreshTrigger
 	interval := n.refreshInterval
 	n.ticker = time.NewTicker(interval)
+	n.heartbeatTicker = time.NewTicker(15 * time.Second)
+	n.heartbeatCount = 0
 	ticker := n.ticker
+	heartbeatTicker := n.heartbeatTicker
 	n.mu.Unlock()
+
+	// Subscribe to data change notifications from rubix
+	// Subject: rubix.v1.local.{org}.{device}.plugindata.nube.taskmanager.changed
+	changeSubject := fmt.Sprintf("%s.plugindata.nube.taskmanager.changed", n.ds.SubjectPrefix())
+	if err := n.ds.SubscribeToDataChanges(changeSubject, func() {
+		// Non-blocking send to trigger channel
+		select {
+		case refreshTrigger <- struct{}{}:
+			ctx.Logger.Info().Msg("🔔 data change notification received - triggering immediate refresh")
+		default:
+			// Channel full, refresh already pending
+		}
+	}); err != nil {
+		ctx.Logger.Warn().Err(err).Msg("failed to subscribe to data change notifications (reactive updates disabled)")
+		// Continue anyway - fallback to periodic polling
+	}
 
 	go func() {
 		defer close(done)
+
+		// Emit immediately on start so values appear right away (don't wait for first tick).
+		outputs, err := n.fetchStats()
+		if err != nil {
+			ctx.Logger.Warn().Err(err).Str("nodeId", n.id).Msg("initial task stats fetch failed")
+		} else {
+			for port, val := range outputs {
+				if err := ctx.Emit(port, val); err != nil {
+					ctx.Logger.Error().Err(err).Str("port", port).Msg("initial emit failed")
+				}
+			}
+		}
+
+		// Emit initial heartbeat
+		n.mu.Lock()
+		n.heartbeatCount++
+		count := n.heartbeatCount
+		n.mu.Unlock()
+		ctx.Emit("heartbeat", pluginnode.NumberVal(float64(count)))
+		ctx.Emit("last_update", pluginnode.StrVal(time.Now().UTC().Format(time.RFC3339)))
+		ctx.Logger.Info().Int64("count", count).Msg("💓 heartbeat emitted")
+
 		for {
 			select {
 			case <-emitCtx.Done():
 				return
+
+			case <-heartbeatTicker.C:
+				// Heartbeat every 15 seconds - lightweight, no DB queries
+				n.mu.Lock()
+				n.heartbeatCount++
+				count := n.heartbeatCount
+				n.mu.Unlock()
+
+				now := time.Now().UTC().Format(time.RFC3339)
+				if err := ctx.Emit("heartbeat", pluginnode.NumberVal(float64(count))); err != nil {
+					ctx.Logger.Error().Err(err).Msg("heartbeat emit failed")
+				}
+				if err := ctx.Emit("last_update", pluginnode.StrVal(now)); err != nil {
+					ctx.Logger.Error().Err(err).Msg("last_update emit failed")
+				}
+				ctx.Logger.Info().Int64("count", count).Str("time", now).Msg("💓 heartbeat emitted")
+
+			case <-refreshTrigger:
+				// Reactive refresh triggered by data change notification
+				ctx.Logger.Info().Msg("🚀 reactive refresh triggered by data change")
+				outputs, err := n.fetchStats()
+				if err != nil {
+					ctx.Logger.Warn().Err(err).Str("nodeId", n.id).Msg("reactive stats fetch failed")
+					continue
+				}
+				for port, val := range outputs {
+					if err := ctx.Emit(port, val); err != nil {
+						ctx.Logger.Error().Err(err).Str("port", port).Msg("reactive emit failed")
+					}
+				}
+				// Also emit heartbeat and timestamp
+				n.mu.Lock()
+				count := n.heartbeatCount
+				n.mu.Unlock()
+				ctx.Emit("heartbeat", pluginnode.NumberVal(float64(count)))
+				ctx.Emit("last_update", pluginnode.StrVal(time.Now().UTC().Format(time.RFC3339)))
+				ctx.Logger.Info().Msg("✅ reactive emission complete")
+
 			case <-ticker.C:
+				// Periodic stats refresh (every 30s by default)
 				outputs, err := n.fetchStats()
 				if err != nil {
 					ctx.Logger.Warn().Err(err).Str("nodeId", n.id).Msg("task stats fetch failed")
@@ -143,6 +230,12 @@ func (n *TaskManagerNode) StartEmitting(ctx pluginnode.EmitContext) error {
 						ctx.Logger.Error().Err(err).Str("port", port).Msg("emit failed")
 					}
 				}
+				// Also emit heartbeat and timestamp on stats refresh
+				n.mu.Lock()
+				count := n.heartbeatCount
+				n.mu.Unlock()
+				ctx.Emit("heartbeat", pluginnode.NumberVal(float64(count)))
+				ctx.Emit("last_update", pluginnode.StrVal(time.Now().UTC().Format(time.RFC3339)))
 			}
 		}
 	}()
@@ -154,9 +247,11 @@ func (n *TaskManagerNode) StopEmitting() error {
 	n.mu.Lock()
 	cancel := n.cancel
 	ticker := n.ticker
+	heartbeatTicker := n.heartbeatTicker
 	done := n.done
 	n.cancel = nil
 	n.ticker = nil
+	n.heartbeatTicker = nil
 	n.done = nil
 	n.mu.Unlock()
 
@@ -165,6 +260,9 @@ func (n *TaskManagerNode) StopEmitting() error {
 	}
 	if ticker != nil {
 		ticker.Stop()
+	}
+	if heartbeatTicker != nil {
+		heartbeatTicker.Stop()
 	}
 	if done != nil {
 		<-done

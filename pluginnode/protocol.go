@@ -41,6 +41,7 @@ type NodePort struct {
 	Kind        string `json:"kind"`                  // "input" or "output"
 	Type        string `json:"type,omitempty"`        // "number", "string", "bool", "any"
 	Description string `json:"description,omitempty"` // tooltip
+	Persist     bool   `json:"persist,omitempty"`     // if true, persist last value to DB (enables boot restoration)
 }
 
 // PortValue carries a typed value over a port.
