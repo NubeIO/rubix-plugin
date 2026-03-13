@@ -111,9 +111,9 @@ func initialModel() model {
 	}
 
 	m := model{
-		stage: stageForm,
-		fields:     fields,
-		inputs:     inputs,
+		stage:     stageForm,
+		fields:    fields,
+		inputs:    inputs,
 		types:     []string{"driver", "service", "utility", "widget"},
 		typeIndex: 0,
 		startedAt: time.Now(),
@@ -447,8 +447,8 @@ func generatePlugin(spec pluginSpec) (string, []string, error) {
 
 	files := map[string]string{
 		filepath.Join(root, "plugin.json"): string(pluginJSON) + "\n",
-		filepath.Join(root, "README.md"): fmt.Sprintf("# %s\n\n%s\n\n## Run\n\n```bash\ngo run ./cmd\n```\n", spec.Name, spec.Description),
-		filepath.Join(root, "go.mod"):    fmt.Sprintf("module %s\n\ngo 1.24.0\n", moduleName),
+		filepath.Join(root, "README.md"):   fmt.Sprintf("# %s\n\n%s\n\n## Run\n\n```bash\ngo run ./cmd\n```\n", spec.Name, spec.Description),
+		filepath.Join(root, "go.mod"):      fmt.Sprintf("module %s\n\ngo 1.24.0\n", moduleName),
 		filepath.Join(root, "cmd", "main.go"): fmt.Sprintf(`package main
 
 import "fmt"
