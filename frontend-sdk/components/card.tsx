@@ -1,13 +1,17 @@
 import React from 'react';
+import { cn } from '../lib/utils';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
-export function Card({ className = '', children, ...props }: CardProps) {
+export function Card({ className, children, ...props }: CardProps) {
   return (
     <div
-      className={`rounded-[var(--rubix-radius-lg)] border border-[var(--rubix-border)] bg-[var(--rubix-card)] text-[var(--rubix-card-foreground)] shadow-[var(--rubix-shadow-sm)] ${className}`}
+      className={cn(
+        'rounded-lg border border-border bg-card text-card-foreground shadow-sm',
+        className
+      )}
       {...props}
     >
       {children}
@@ -19,9 +23,9 @@ export interface CardHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
-export function CardHeader({ className = '', children, ...props }: CardHeaderProps) {
+export function CardHeader({ className, children, ...props }: CardHeaderProps) {
   return (
-    <div className={`flex flex-col space-y-1.5 p-6 ${className}`} {...props}>
+    <div className={cn('flex flex-col space-y-1.5 p-6', className)} {...props}>
       {children}
     </div>
   );
@@ -31,9 +35,9 @@ export interface CardTitleProps extends React.HTMLAttributes<HTMLHeadingElement>
   children: React.ReactNode;
 }
 
-export function CardTitle({ className = '', children, ...props }: CardTitleProps) {
+export function CardTitle({ className, children, ...props }: CardTitleProps) {
   return (
-    <h3 className={`text-2xl font-semibold leading-none tracking-tight ${className}`} {...props}>
+    <h3 className={cn('text-2xl font-semibold leading-none tracking-tight', className)} {...props}>
       {children}
     </h3>
   );
@@ -43,9 +47,9 @@ export interface CardDescriptionProps extends React.HTMLAttributes<HTMLParagraph
   children: React.ReactNode;
 }
 
-export function CardDescription({ className = '', children, ...props }: CardDescriptionProps) {
+export function CardDescription({ className, children, ...props }: CardDescriptionProps) {
   return (
-    <p className={`text-sm text-[var(--rubix-muted-foreground)] ${className}`} {...props}>
+    <p className={cn('text-sm text-muted-foreground', className)} {...props}>
       {children}
     </p>
   );
@@ -55,9 +59,9 @@ export interface CardContentProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
-export function CardContent({ className = '', children, ...props }: CardContentProps) {
+export function CardContent({ className, children, ...props }: CardContentProps) {
   return (
-    <div className={`p-6 pt-0 ${className}`} {...props}>
+    <div className={cn('p-6 pt-0', className)} {...props}>
       {children}
     </div>
   );
@@ -67,9 +71,9 @@ export interface CardFooterProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
 }
 
-export function CardFooter({ className = '', children, ...props }: CardFooterProps) {
+export function CardFooter({ className, children, ...props }: CardFooterProps) {
   return (
-    <div className={`flex items-center p-6 pt-0 ${className}`} {...props}>
+    <div className={cn('flex items-center p-6 pt-0', className)} {...props}>
       {children}
     </div>
   );

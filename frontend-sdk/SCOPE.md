@@ -59,7 +59,7 @@
 - Plugin client wrapper
 - TypeScript types
 
-**Current Issue:** Components use Tailwind classes but plugins don't have Tailwind configured → ugly UI
+**Current Issue:** Components use CSS variables (`bg-[var(--rubix-*)]`) instead of Tailwind utilities, and plugins don't have Tailwind configured → inconsistent styling with main app
 
 ---
 
@@ -75,17 +75,29 @@ npm install -D tailwindcss@next @tailwindcss/vite
 npm install react react-dom  # peer deps
 ```
 
-**2.2. Create Tailwind Config**
-```js
-// frontend-sdk/tailwind.config.js
-export default {
-  content: ['./components/**/*.{ts,tsx}', './index.ts'],
-  // Import rubix design tokens
-  theme: {
-    extend: {
-      // Match rubix's design system
-    }
-  }
+**2.2. Create Tailwind v4 Config (using @theme syntax)**
+```css
+/* frontend-sdk/globals.css */
+@import 'tailwindcss';
+
+/* Design tokens - match main rubix app exactly */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  /* ... copy from main app's globals.css */
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  /* ... dark mode tokens */
+}
+
+@theme inline {
+  --radius-lg: var(--radius);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  /* ... expose as Tailwind utilities */
 }
 ```
 
@@ -96,9 +108,17 @@ export default {
   "name": "@rubix/plugin-ui",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./globals.css": "./dist/globals.css"
+  },
   "scripts": {
-    "build": "tsup && tailwindcss -o dist/styles.css",
+    "build": "tsup && tailwindcss -i ./globals.css -o dist/globals.css",
     "dev": "tsup --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.0.0-alpha.25",
+    "tsup": "^8.0.0"
   }
 }
 ```
@@ -110,18 +130,24 @@ npm install file:../../frontend-sdk
 # Or: npm install @rubix/plugin-ui (if published)
 ```
 
-**2.5. Plugins Configure Tailwind**
-```js
-// nube.plm/frontend/tailwind.config.js
-import baseConfig from '@rubix/plugin-ui/tailwind.config';
+**2.5. Plugins Import SDK Styles (Tailwind v4)**
+```ts
+// nube.plm/frontend/src/main.tsx
+import '@rubix/sdk/globals.css';  // ← Imports Tailwind + design tokens
+import './index.css';  // ← Plugin-specific styles (if any)
+```
 
-export default {
-  ...baseConfig,
-  content: [
-    './src/**/*.{ts,tsx}',
-    '../../frontend-sdk/components/**/*.{ts,tsx}'  // Include SDK
-  ]
-}
+```ts
+// nube.plm/frontend/vite.config.ts
+import tailwindcss from '@tailwindcss/vite';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    tailwindcss(),  // ← Enable Tailwind v4
+    federation({ /* ... */ }),
+  ],
+});
 ```
 
 **Outcome:** Plugins get beautiful, consistent UI with Tailwind

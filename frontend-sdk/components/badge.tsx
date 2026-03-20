@@ -1,5 +1,7 @@
 import React from 'react';
-import type { BadgeVariant } from '../types';
+import { cn } from '../lib/utils';
+
+export type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning';
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: BadgeVariant;
@@ -7,20 +9,25 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
-  default: 'bg-[var(--rubix-primary)] text-[var(--rubix-primary-foreground)] hover:opacity-90',
-  secondary: 'bg-[var(--rubix-secondary)] text-[var(--rubix-secondary-foreground)] hover:opacity-90',
-  destructive: 'bg-[var(--rubix-destructive)] text-[var(--rubix-destructive-foreground)] hover:opacity-90',
-  outline: 'border border-[var(--rubix-border)] text-[var(--rubix-foreground)]',
-  success: 'bg-[oklch(0.7_0.15_145)] text-white',
-  warning: 'bg-[oklch(0.75_0.15_85)] text-[oklch(0.2_0_0)]',
+  default: 'bg-primary text-primary-foreground hover:bg-primary/80',
+  secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+  destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/80',
+  outline: 'border border-input text-foreground',
+  success: 'bg-green-500 text-white hover:bg-green-500/80',
+  warning: 'bg-yellow-500 text-white hover:bg-yellow-500/80',
 };
 
-export function Badge({ variant = 'default', className = '', children, ...props }: BadgeProps) {
-  const baseStyles = 'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors';
-  const variantClass = variantStyles[variant];
-
+export function Badge({ variant = 'default', className, children, ...props }: BadgeProps) {
   return (
-    <div className={`${baseStyles} ${variantClass} ${className}`} {...props}>
+    <div
+      className={cn(
+        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors',
+        'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+        variantStyles[variant],
+        className
+      )}
+      {...props}
+    >
       {children}
     </div>
   );

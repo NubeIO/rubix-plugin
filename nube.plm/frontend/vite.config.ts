@@ -1,11 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { federation } from '@module-federation/vite';
+import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     federation({
       name: 'nube_plm',
       filename: 'remoteEntry.js',

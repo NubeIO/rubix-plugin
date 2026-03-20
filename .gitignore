@@ -44,6 +44,7 @@ __debug_bin
 nubeio-example/example
 
 # Frontend dependencies
+frontend-sdk/node_modules
 nubeio-example/frontend/node_modules
 nubeio-example/frontend/.__mf__temp
 nubeio-example/dist-frontend

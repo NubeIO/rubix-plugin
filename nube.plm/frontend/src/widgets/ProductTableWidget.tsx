@@ -13,7 +13,7 @@ import {
   Label,
   Skeleton,
 } from '@rubix/sdk';
-import '@rubix/sdk/styles/styles.css';
+import '@rubix/sdk/globals.css';
 
 interface Product {
   id: string;
@@ -116,10 +116,8 @@ export default function ProductTableWidget({
   const interval = (settings?.refresh?.interval ?? 30) * 1000;
   const autoRefresh = settings?.refresh?.enableAutoRefresh ?? true;
 
-  // Styling based on compact mode
-  const padding = compactMode ? 12 : 16;
+  // Styling based on compact mode (using Tailwind classes now)
   const cellPadding = compactMode ? '6px 4px' : '8px 4px';
-  const fontSize = compactMode ? 11 : 12;
 
   const fetchProducts = async () => {
     if (!orgId || !deviceId) return;
@@ -342,8 +340,8 @@ export default function ProductTableWidget({
 
   if (loading) {
     return (
-      <div style={{ padding, color: '#666', fontSize }}>
-        <div style={{ marginBottom: 12 }}>
+      <div className="p-4">
+        <div className="mb-3">
           <Skeleton className="h-4 w-32 mb-4" />
           <Skeleton className="h-10 w-full mb-2" />
           <Skeleton className="h-10 w-full mb-2" />
@@ -359,8 +357,8 @@ export default function ProductTableWidget({
 
   if (error) {
     return (
-      <div style={{ padding, fontSize }}>
-        <div className="text-[var(--rubix-destructive)] mb-3">Error: {error}</div>
+      <div className="p-4 text-sm">
+        <div className="text-destructive mb-3">Error: {error}</div>
         {/* DEBUG TEST BUTTON */}
         <Button onClick={handleTestClick} size="sm" variant="secondary">
           🧪 TEST CLICK (Count: {testClickCount})
@@ -371,23 +369,23 @@ export default function ProductTableWidget({
 
   if (products.length === 0) {
     return (
-      <div style={{ padding }}>
+      <div className="p-4">
         {/* DEBUG: Props info */}
-        <div style={{ fontSize: 10, color: '#666', marginBottom: 12, fontFamily: 'monospace' }}>
+        <div className="text-xs text-muted-foreground mb-3 font-mono">
           Props: orgId={orgId ? '✅' : '❌'} deviceId={deviceId ? '✅' : '❌'} baseUrl={baseUrl ? '✅' : '❌'}
         </div>
 
         {/* DEBUG TEST BUTTON */}
-        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+        <div className="text-center mb-4">
           <Button onClick={handleTestClick} size="sm" variant="secondary">
             🧪 TEST CLICK (Count: {testClickCount})
           </Button>
         </div>
 
-        <div className="text-[var(--rubix-muted-foreground)] text-center mb-4" style={{ fontSize }}>
+        <div className="text-muted-foreground text-center mb-4 text-sm">
           No products found. Create one to get started.
         </div>
-        <div style={{ textAlign: 'center' }}>
+        <div className="text-center">
           <Button onClick={handleCreateClick} disabled={!canCreate} size="sm">
             <PlusIcon size={compactMode ? 12 : 14} />
             New Product
@@ -410,41 +408,33 @@ export default function ProductTableWidget({
   }
 
   return (
-    <div style={{ padding, height: '100%', overflow: 'auto' }}>
+    <div className="p-4 h-full overflow-auto">
       {/* DEBUG: Props info */}
-      <div style={{ fontSize: 10, color: '#666', marginBottom: 8, fontFamily: 'monospace' }}>
+      <div className="text-xs text-muted-foreground mb-2 font-mono">
         Props: orgId={orgId ? '✅' : '❌'} deviceId={deviceId ? '✅' : '❌'} baseUrl={baseUrl ? '✅' : '❌'}
       </div>
 
       {/* DEBUG TEST BUTTON */}
-      <div style={{ marginBottom: 12 }}>
+      <div className="mb-3">
         <Button onClick={handleTestClick} size="sm" variant="secondary">
           🧪 TEST CLICK (Count: {testClickCount})
         </Button>
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: compactMode ? 8 : 12,
-        }}
-      >
-        <div style={{ fontSize: compactMode ? 10 : 11, color: '#999' }}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-xs text-muted-foreground">
           {products.length} product{products.length !== 1 ? 's' : ''}
         </div>
-        <Button onClick={handleCreateClick} disabled={!canCreate} size={compactMode ? 'sm' : 'sm'}>
-          <PlusIcon size={compactMode ? 12 : 14} />
+        <Button onClick={handleCreateClick} disabled={!canCreate} size="sm">
+          <PlusIcon size={14} />
           New Product
         </Button>
       </div>
 
       <table
+        className="w-full text-xs"
         style={{
-          width: '100%',
           borderCollapse: 'collapse',
-          fontSize,
         }}
       >
         <thead>

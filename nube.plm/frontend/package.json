@@ -14,9 +14,11 @@
   },
   "devDependencies": {
     "@module-federation/vite": "^1.11.0",
+    "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.0.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.11"
   }

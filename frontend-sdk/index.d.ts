@@ -40,8 +40,50 @@ export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 export type { DialogProps, DialogContentProps, DialogHeaderProps, DialogTitleProps, DialogDescriptionProps, DialogFooterProps } from './components/dialog';
 export { Skeleton } from './components/skeleton';
 export type { SkeletonProps } from './components/skeleton';
-export { createPluginClient, usePluginClient, PluginClient, PluginClientError } from './plugin-client';
-export type { PluginClientConfig, QueryNodesOptions, CreateNodeInput, UpdateNodeInput } from './plugin-client';
-export type { PluginWidgetProps, PluginPageProps, RubixApiResponse, RubixNode, QueryResult, ButtonVariant, ButtonSize, BadgeVariant, } from './types';
+export type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+export type ButtonSize = 'sm' | 'md' | 'lg';
+export type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning';
+export interface PluginWidgetProps {
+    orgId?: string;
+    deviceId?: string;
+    baseUrl?: string;
+    token?: string;
+    settings?: Record<string, unknown>;
+    config?: Record<string, unknown>;
+}
+export interface PluginPageProps {
+    orgId?: string;
+    deviceId?: string;
+    baseUrl?: string;
+    token?: string;
+}
+export interface RubixApiResponse<T> {
+    data: T;
+    meta?: {
+        timestamp?: string;
+        total?: number;
+        [key: string]: unknown;
+    };
+}
+export interface RubixNode {
+    id: string;
+    name: string;
+    type: string;
+    parentId?: string;
+    settings?: Record<string, unknown>;
+    data?: Record<string, unknown>;
+    ui?: Record<string, unknown>;
+    position?: {
+        x: number;
+        y: number;
+    };
+    createdAt?: string;
+    updatedAt?: string;
+}
+export interface QueryResult {
+    nodes: RubixNode[];
+    total: number;
+}
 export { RASClient, fetchAdapter } from './ras/client';
-export type { Node, Edge, Ref } from './ras/types';
+export type { Node } from './ras/types';
+export { cn } from './lib/utils';

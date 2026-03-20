@@ -1,8 +1,9 @@
 import React from 'react';
-import type { ButtonVariant, ButtonSize } from '../types';
+export type ButtonVariant = 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+export type ButtonSize = 'sm' | 'md' | 'lg';
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: ButtonVariant;
     size?: ButtonSize;
     children: React.ReactNode;
 }
-export declare function Button({ variant, size, className, children, ...props }: ButtonProps): any;
+export declare function Button({ variant, size, className, children, ...props }: ButtonProps): import("react/jsx-runtime").JSX.Element;
