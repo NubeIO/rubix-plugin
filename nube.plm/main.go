@@ -1,52 +1,85 @@
 package main
 
 import (
-	"log"
+	"flag"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/nats-io/nats.go"
+	"github.com/NubeIO/rubix-plm-plugin/internal/nodes"
+	"github.com/NubeIO/rubix-plugin/natslib"
+	"github.com/NubeIO/rubix-plugin/pluginnode"
+	"github.com/rs/zerolog"
 )
 
 func main() {
-	// Get NATS URL from environment or use default
-	natsURL := os.Getenv("NATS_URL")
-	if natsURL == "" {
-		natsURL = "nats://localhost:4222"
-	}
+	// Parse command-line flags
+	natsURL := flag.String("nats", "nats://localhost:4222", "NATS server URL")
+	orgID := flag.String("org", "org1", "Organization ID")
+	deviceID := flag.String("device", "device0", "Device ID")
+	prefix := flag.String("prefix", "rubix.v1.local", "NATS subject prefix")
+	vendor := flag.String("vendor", "nube", "Plugin vendor")
+	pluginName := flag.String("name", "plm", "Plugin name")
+	logLevel := flag.String("log", "info", "Log level (debug/info/warn/error)")
+	flag.Parse()
 
-	log.Printf("[PLM] Starting PLM plugin")
-	log.Printf("[PLM] Connecting to NATS at %s", natsURL)
+	// Setup logger
+	level, err := zerolog.ParseLevel(*logLevel)
+	if err != nil {
+		level = zerolog.InfoLevel
+	}
+	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.Kitchen}).
+		Level(level).
+		With().Timestamp().Str("plugin", *pluginName).Logger()
+
+	logger.Info().
+		Str("nats", *natsURL).
+		Str("org", *orgID).
+		Str("device", *deviceID).
+		Msg("starting PLM plugin")
 
 	// Connect to NATS
-	nc, err := nats.Connect(natsURL,
-		nats.Name("plm-plugin"),
-		nats.Timeout(10*time.Second),
-		nats.ReconnectWait(2*time.Second),
-		nats.MaxReconnects(-1), // unlimited reconnects
-	)
+	nc, err := natslib.Connect(*natsURL)
 	if err != nil {
-		log.Fatalf("[PLM] Failed to connect to NATS: %v", err)
+		logger.Fatal().Err(err).Msg("failed to connect to NATS")
 	}
 	defer nc.Close()
+	logger.Info().Msg("connected to NATS")
 
-	log.Printf("[PLM] Connected to NATS")
+	// Node factory
+	factory := func(nodeType string) pluginnode.PluginNode {
+		switch nodeType {
+		case "plm.product":
+			return &nodes.ProductNode{}
+		default:
+			return nil
+		}
+	}
 
-	// Phase 1: Hooks disabled - just product CRUD
-	// Phase 2: Will add BOM hooks later
+	// Start the plugin server
+	server, err := pluginnode.NewPluginServer(pluginnode.PluginServerConfig{
+		NATSClient:     nc,
+		Prefix:         *prefix,
+		OrgID:          *orgID,
+		DeviceID:       *deviceID,
+		Vendor:         *vendor,
+		PluginName:     *pluginName,
+		Version:        "1.0.0",
+		Factory:        factory,
+		Logger:         logger,
+		AutoStartNodes: true,
+	})
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to create plugin server")
+	}
+	defer server.Close()
 
-	log.Printf("[PLM] ✓ Plugin ready - Product CRUD only")
-	log.Printf("[PLM] ✓ Hooks: DISABLED (Phase 1)")
+	logger.Info().Msg("PLM plugin started — product nodes ready")
 
-	// Wait for interrupt signal
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-	<-sigChan
-
-	log.Printf("[PLM] Shutting down...")
+	// Wait for shutdown signal
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	<-sigCh
+	logger.Info().Msg("shutdown signal received")
 }
-
-// Hook handlers - DISABLED for Phase 1
-// Phase 2: Will add BOM explosion logic here

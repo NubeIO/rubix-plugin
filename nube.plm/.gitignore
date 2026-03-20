@@ -1,0 +1,32 @@
+# Plugin binary
+nube.plm
+
+# Frontend build artifacts
+dist-frontend/
+
+# Frontend dependencies
+frontend/node_modules/
+frontend/.__mf__temp/
+
+# pnpm lock file (comment out if you want to track it)
+# frontend/pnpm-lock.yaml
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+*.tmp
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Debug files
+debug
+__debug_bin

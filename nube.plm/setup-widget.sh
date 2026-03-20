@@ -51,7 +51,7 @@ if [ -d "$RUBIX_DIR" ]; then
   echo "  ✓ Frontend widget copied"
 
   # Copy settings YAML
-  cp product-table-widget-settings.yaml "$PLUGIN_DIR/"
+  cp ../product-table-widget-settings.yaml "$PLUGIN_DIR/"
   echo "  ✓ Settings schema copied"
 
   echo ""

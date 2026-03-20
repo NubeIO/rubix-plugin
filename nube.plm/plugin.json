@@ -6,43 +6,7 @@
   "version": "1.0.0",
   "description": "Product management system",
   "category": "manufacturing",
-  "nodeTypes": [
-    {
-      "type": "plm.product",
-      "displayName": "Product",
-      "description": "A manufactured product",
-      "icon": "Package",
-      "color": "#3b82f6",
-      "maxOneNode": false,
-      "settings": {
-        "productCode": {
-          "type": "string",
-          "displayName": "Product Code",
-          "description": "Unique product identifier (SKU)",
-          "required": false
-        },
-        "description": {
-          "type": "string",
-          "displayName": "Description",
-          "description": "Product description",
-          "required": false
-        },
-        "status": {
-          "type": "select",
-          "displayName": "Status",
-          "description": "Product lifecycle status",
-          "options": ["Design", "Prototype", "Production", "Discontinued"],
-          "default": "Design"
-        },
-        "price": {
-          "type": "number",
-          "displayName": "Price",
-          "description": "Product price",
-          "required": false
-        }
-      }
-    }
-  ],
+  "nodeTypes": ["plm.product"],
   "widgets": [
     {
       "id": "product-table-widget",
@@ -54,7 +18,7 @@
       "supportsQuery": false,
       "requiresBackend": false,
       "defaultSize": { "w": 6, "h": 4 },
-      "settingsSchema": "product-table-widget-settings.yaml"
+      "settingsSchemaFile": "product-table-widget-settings.yaml"
     }
   ],
   "execPath": "./nube.plm",
