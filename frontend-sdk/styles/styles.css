@@ -1,0 +1,105 @@
+/**
+ * Rubix Plugin UI - Design Tokens
+ *
+ * Import this CSS file in your plugin to automatically match rubix's design system.
+ * Supports light/dark mode and uses the same OKLCH color space as rubix core.
+ *
+ * Usage:
+ * import '@rubix/plugin-ui/styles.css';
+ */
+
+:root {
+  /* Border radius */
+  --rubix-radius: 0.625rem;
+  --rubix-radius-sm: calc(var(--rubix-radius) - 4px);
+  --rubix-radius-md: calc(var(--rubix-radius) - 2px);
+  --rubix-radius-lg: var(--rubix-radius);
+
+  /* Colors - Light Mode */
+  --rubix-background: oklch(1 0 0);
+  --rubix-foreground: oklch(0.145 0 0);
+  --rubix-card: oklch(1 0 0);
+  --rubix-card-foreground: oklch(0.145 0 0);
+  --rubix-popover: oklch(1 0 0);
+  --rubix-popover-foreground: oklch(0.145 0 0);
+  --rubix-primary: oklch(0.205 0 0);
+  --rubix-primary-foreground: oklch(0.985 0 0);
+  --rubix-secondary: oklch(0.97 0 0);
+  --rubix-secondary-foreground: oklch(0.205 0 0);
+  --rubix-muted: oklch(0.97 0 0);
+  --rubix-muted-foreground: oklch(0.556 0 0);
+  --rubix-accent: oklch(0.97 0 0);
+  --rubix-accent-foreground: oklch(0.205 0 0);
+  --rubix-destructive: oklch(0.577 0.245 27.325);
+  --rubix-destructive-foreground: oklch(0.985 0 0);
+  --rubix-border: oklch(0.922 0 0);
+  --rubix-input: oklch(0.922 0 0);
+  --rubix-ring: oklch(0.708 0 0);
+
+  /* Typography */
+  --rubix-font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --rubix-font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+
+  /* Shadows */
+  --rubix-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --rubix-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --rubix-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+}
+
+/* Dark Mode */
+.dark,
+[data-theme='dark'] {
+  --rubix-background: oklch(0.145 0 0);
+  --rubix-foreground: oklch(0.985 0 0);
+  --rubix-card: oklch(0.16 0 0);
+  --rubix-card-foreground: oklch(0.985 0 0);
+  --rubix-popover: oklch(0.269 0 0);
+  --rubix-popover-foreground: oklch(0.985 0 0);
+  --rubix-primary: oklch(0.922 0 0);
+  --rubix-primary-foreground: oklch(0.205 0 0);
+  --rubix-secondary: oklch(0.269 0 0);
+  --rubix-secondary-foreground: oklch(0.985 0 0);
+  --rubix-muted: oklch(0.269 0 0);
+  --rubix-muted-foreground: oklch(0.708 0 0);
+  --rubix-accent: oklch(0.371 0 0);
+  --rubix-accent-foreground: oklch(0.985 0 0);
+  --rubix-destructive: oklch(0.704 0.191 22.216);
+  --rubix-border: oklch(1 0 0 / 10%);
+  --rubix-input: oklch(1 0 0 / 15%);
+  --rubix-ring: oklch(0.556 0 0);
+}
+
+/* Base plugin container */
+.rubix-plugin {
+  font-family: var(--rubix-font-sans);
+  color: var(--rubix-foreground);
+  background: var(--rubix-background);
+}
+
+/* Utility classes for quick styling */
+.rubix-text-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.rubix-text-base {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.rubix-text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+.rubix-font-medium {
+  font-weight: 500;
+}
+
+.rubix-font-semibold {
+  font-weight: 600;
+}
+
+.rubix-font-bold {
+  font-weight: 700;
+}

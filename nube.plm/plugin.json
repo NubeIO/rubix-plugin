@@ -7,6 +7,28 @@
   "description": "Product management system",
   "category": "manufacturing",
   "nodeTypes": ["plm.product"],
+  "policy": {
+    "nodeTypes": ["plm.product"],
+    "hooks": {
+      "enabled": true,
+      "endpoint": "/hooks/nodes",
+      "create": {
+        "enabled": true,
+        "beforeHook": true,
+        "afterHook": true
+      },
+      "update": {
+        "enabled": true,
+        "beforeHook": true,
+        "afterHook": true
+      },
+      "delete": {
+        "enabled": true,
+        "beforeHook": true,
+        "afterHook": true
+      }
+    }
+  },
   "widgets": [
     {
       "id": "product-table-widget",

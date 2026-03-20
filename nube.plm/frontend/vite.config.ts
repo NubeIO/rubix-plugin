@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { federation } from '@module-federation/vite';
+import path from 'path';
 
 export default defineConfig({
   plugins: [
@@ -23,6 +24,12 @@ export default defineConfig({
       },
     }),
   ],
+  resolve: {
+    alias: {
+      // @rubix/sdk → rubix-plugin/frontend-sdk (generated RAS client)
+      '@rubix/sdk': path.resolve(__dirname, '../../frontend-sdk'),
+    },
+  },
   base: '/api/v1/ext/nube.plm/',
   build: {
     target: 'esnext',

@@ -1,4 +1,19 @@
 import { useState, useEffect } from 'react';
+import { createPluginClient } from '@rubix/sdk/plugin-client';
+// @ts-ignore - SDK types are resolved at build time
+import {
+  Button,
+  Badge,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  Input,
+  Label,
+  Skeleton,
+} from '@rubix/sdk';
+import '@rubix/sdk/styles/styles.css';
 
 interface Product {
   id: string;
@@ -67,6 +82,31 @@ export default function ProductTableWidget({
   const [isCreating, setIsCreating] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [testClickCount, setTestClickCount] = useState(0);
+
+  // DEBUG: Log props on mount and changes
+  useEffect(() => {
+    console.log('🔵 [PLM Widget] Props received:', {
+      orgId,
+      deviceId,
+      baseUrl,
+      token: token ? `${token.substring(0, 10)}...` : undefined,
+      settings,
+    });
+  }, [orgId, deviceId, baseUrl, token, settings]);
+
+  // DEBUG: Log dialog state changes
+  useEffect(() => {
+    console.log('🔵 [PLM Widget] createDialogOpen changed:', createDialogOpen);
+  }, [createDialogOpen]);
+
+  useEffect(() => {
+    console.log('🔵 [PLM Widget] editDialogOpen changed:', editDialogOpen);
+  }, [editDialogOpen]);
+
+  useEffect(() => {
+    console.log('🔵 [PLM Widget] deleteDialogOpen changed:', deleteDialogOpen);
+  }, [deleteDialogOpen]);
 
   // Extract settings with defaults
   const showCode = settings?.display?.showCode ?? true;
@@ -85,21 +125,12 @@ export default function ProductTableWidget({
     if (!orgId || !deviceId) return;
 
     try {
-      const response = await fetch(`${baseUrl}/${orgId}/${deviceId}/query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          filter: 'type is "plm.product"',
-        }),
+      const client = createPluginClient({ orgId, deviceId, baseUrl, token });
+      const products = await client.queryNodes({
+        filter: 'type is "plm.product"',
       });
 
-      if (!response.ok) throw new Error('Failed to fetch products');
-
-      const result = await response.json();
-      setProducts(result.data || []);
+      setProducts(products as Product[]);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
@@ -134,28 +165,17 @@ export default function ProductTableWidget({
     setCreateError(null);
 
     try {
-      const response = await fetch(`${baseUrl}/${orgId}/${deviceId}/nodes`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
+      const client = createPluginClient({ orgId, deviceId, baseUrl, token });
+      await client.createNode({
+        type: 'plm.product',
+        name: formData.name,
+        settings: {
+          productCode: formData.productCode,
+          description: formData.description || undefined,
+          status: formData.status,
+          price: formData.price ? parseFloat(formData.price) : undefined,
         },
-        body: JSON.stringify({
-          type: 'plm.product',
-          name: formData.name,
-          settings: {
-            productCode: formData.productCode,
-            description: formData.description || undefined,
-            status: formData.status,
-            price: formData.price ? parseFloat(formData.price) : undefined,
-          },
-        }),
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to create product');
-      }
 
       // Success - close dialog and refresh
       setCreateDialogOpen(false);
@@ -168,8 +188,8 @@ export default function ProductTableWidget({
       });
       setFormErrors({});
       fetchProducts();
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : 'Failed to create product');
+    } catch (err: any) {
+      setCreateError(err.message);
     } finally {
       setIsCreating(false);
     }
@@ -195,6 +215,7 @@ export default function ProductTableWidget({
   };
 
   const handleEditClick = (product: Product) => {
+    console.log('🔵 [PLM Widget] Edit button clicked:', product.id);
     setSelectedProduct(product);
     setFormData({
       name: product.name,
@@ -218,27 +239,16 @@ export default function ProductTableWidget({
     setCreateError(null);
 
     try {
-      const response = await fetch(`${baseUrl}/${orgId}/${deviceId}/nodes/${selectedProduct.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }),
+      const client = createPluginClient({ orgId, deviceId, baseUrl, token });
+      await client.updateNode(selectedProduct.id, {
+        name: formData.name,
+        settings: {
+          productCode: formData.productCode,
+          description: formData.description || undefined,
+          status: formData.status,
+          price: formData.price ? parseFloat(formData.price) : undefined,
         },
-        body: JSON.stringify({
-          name: formData.name,
-          settings: {
-            productCode: formData.productCode,
-            description: formData.description || undefined,
-            status: formData.status,
-            price: formData.price ? parseFloat(formData.price) : undefined,
-          },
-        }),
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to update product');
-      }
 
       setEditDialogOpen(false);
       setSelectedProduct(null);
@@ -251,8 +261,8 @@ export default function ProductTableWidget({
       });
       setFormErrors({});
       fetchProducts();
-    } catch (err) {
-      setCreateError(err instanceof Error ? err.message : 'Failed to update product');
+    } catch (err: any) {
+      setCreateError(err.message);
     } finally {
       setIsUpdating(false);
     }
@@ -274,8 +284,23 @@ export default function ProductTableWidget({
   };
 
   const handleDeleteClick = (product: Product) => {
+    console.log('🔵 [PLM Widget] Delete button clicked:', product.id);
     setSelectedProduct(product);
     setDeleteDialogOpen(true);
+  };
+
+  const handleTestClick = () => {
+    console.log('🔵 [PLM Widget] TEST BUTTON CLICKED!');
+    const newCount = testClickCount + 1;
+    setTestClickCount(newCount);
+    alert(`Test button works! Click count: ${newCount}`);
+  };
+
+  const handleCreateClick = () => {
+    console.log('🔵 [PLM Widget] Create button clicked');
+    console.log('🔵 [PLM Widget] canCreate:', canCreate);
+    console.log('🔵 [PLM Widget] Current state:', { createDialogOpen, orgId, deviceId, baseUrl });
+    setCreateDialogOpen(true);
   };
 
   const confirmDelete = async () => {
@@ -284,22 +309,14 @@ export default function ProductTableWidget({
     setIsDeleting(true);
 
     try {
-      const response = await fetch(`${baseUrl}/${orgId}/${deviceId}/nodes/${selectedProduct.id}`, {
-        method: 'DELETE',
-        headers: {
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete product');
-      }
+      const client = createPluginClient({ orgId, deviceId, baseUrl, token });
+      await client.deleteNode(selectedProduct.id);
 
       setDeleteDialogOpen(false);
       setSelectedProduct(null);
       fetchProducts();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete product');
+    } catch (err: any) {
+      alert(err.message);
     } finally {
       setIsDeleting(false);
     }
@@ -320,58 +337,61 @@ export default function ProductTableWidget({
     return () => clearInterval(intervalId);
   }, [orgId, deviceId, baseUrl, token, interval, autoRefresh]);
 
+  // DEBUG: Show props status
+  const canCreate = !!(orgId && deviceId && baseUrl);
+
   if (loading) {
     return (
       <div style={{ padding, color: '#666', fontSize }}>
-        Loading products...
+        <div style={{ marginBottom: 12 }}>
+          <Skeleton className="h-4 w-32 mb-4" />
+          <Skeleton className="h-10 w-full mb-2" />
+          <Skeleton className="h-10 w-full mb-2" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+        {/* DEBUG TEST BUTTON */}
+        <Button onClick={handleTestClick} size="sm" variant="secondary">
+          🧪 TEST CLICK (Count: {testClickCount})
+        </Button>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div style={{ padding, color: '#e74c3c', fontSize }}>
-        Error: {error}
+      <div style={{ padding, fontSize }}>
+        <div className="text-[var(--rubix-destructive)] mb-3">Error: {error}</div>
+        {/* DEBUG TEST BUTTON */}
+        <Button onClick={handleTestClick} size="sm" variant="secondary">
+          🧪 TEST CLICK (Count: {testClickCount})
+        </Button>
       </div>
     );
   }
 
-  const canCreate = !!(orgId && deviceId && baseUrl);
-
   if (products.length === 0) {
     return (
       <div style={{ padding }}>
-        <div
-          style={{
-            color: '#999',
-            textAlign: 'center',
-            fontSize,
-            marginBottom: 16,
-          }}
-        >
+        {/* DEBUG: Props info */}
+        <div style={{ fontSize: 10, color: '#666', marginBottom: 12, fontFamily: 'monospace' }}>
+          Props: orgId={orgId ? '✅' : '❌'} deviceId={deviceId ? '✅' : '❌'} baseUrl={baseUrl ? '✅' : '❌'}
+        </div>
+
+        {/* DEBUG TEST BUTTON */}
+        <div style={{ textAlign: 'center', marginBottom: 16 }}>
+          <Button onClick={handleTestClick} size="sm" variant="secondary">
+            🧪 TEST CLICK (Count: {testClickCount})
+          </Button>
+        </div>
+
+        <div className="text-[var(--rubix-muted-foreground)] text-center mb-4" style={{ fontSize }}>
           No products found. Create one to get started.
         </div>
         <div style={{ textAlign: 'center' }}>
-          <button
-            onClick={() => setCreateDialogOpen(true)}
-            disabled={!canCreate}
-            style={{
-              padding: '8px 16px',
-              fontSize: 12,
-              fontWeight: 500,
-              color: canCreate ? '#fff' : '#999',
-              backgroundColor: canCreate ? '#3b82f6' : '#e5e7eb',
-              border: 'none',
-              borderRadius: 4,
-              cursor: canCreate ? 'pointer' : 'not-allowed',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
-            <PlusIcon />
+          <Button onClick={handleCreateClick} disabled={!canCreate} size="sm">
+            <PlusIcon size={compactMode ? 12 : 14} />
             New Product
-          </button>
+          </Button>
         </div>
         {createDialogOpen && (
           <CreateProductDialog
@@ -391,6 +411,18 @@ export default function ProductTableWidget({
 
   return (
     <div style={{ padding, height: '100%', overflow: 'auto' }}>
+      {/* DEBUG: Props info */}
+      <div style={{ fontSize: 10, color: '#666', marginBottom: 8, fontFamily: 'monospace' }}>
+        Props: orgId={orgId ? '✅' : '❌'} deviceId={deviceId ? '✅' : '❌'} baseUrl={baseUrl ? '✅' : '❌'}
+      </div>
+
+      {/* DEBUG TEST BUTTON */}
+      <div style={{ marginBottom: 12 }}>
+        <Button onClick={handleTestClick} size="sm" variant="secondary">
+          🧪 TEST CLICK (Count: {testClickCount})
+        </Button>
+      </div>
+
       <div
         style={{
           display: 'flex',
@@ -402,26 +434,10 @@ export default function ProductTableWidget({
         <div style={{ fontSize: compactMode ? 10 : 11, color: '#999' }}>
           {products.length} product{products.length !== 1 ? 's' : ''}
         </div>
-        <button
-          onClick={() => setCreateDialogOpen(true)}
-          disabled={!canCreate}
-          style={{
-            padding: compactMode ? '4px 8px' : '6px 12px',
-            fontSize: compactMode ? 10 : 11,
-            fontWeight: 500,
-            color: canCreate ? '#fff' : '#999',
-            backgroundColor: canCreate ? '#3b82f6' : '#e5e7eb',
-            border: 'none',
-            borderRadius: 4,
-            cursor: canCreate ? 'pointer' : 'not-allowed',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-          }}
-        >
+        <Button onClick={handleCreateClick} disabled={!canCreate} size={compactMode ? 'sm' : 'sm'}>
           <PlusIcon size={compactMode ? 12 : 14} />
           New Product
-        </button>
+        </Button>
       </div>
 
       <table
@@ -480,7 +496,7 @@ export default function ProductTableWidget({
               )}
               {showStatus && (
                 <td style={{ padding: cellPadding }}>
-                  <StatusBadge status={product.settings.status} compact={compactMode} />
+                  <StatusBadge status={product.settings.status} />
                 </td>
               )}
               {showPrice && (
@@ -503,36 +519,23 @@ export default function ProductTableWidget({
                 }}
               >
                 <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                  <button
+                  <Button
                     onClick={() => handleEditClick(product)}
-                    style={{
-                      padding: compactMode ? '2px 6px' : '4px 8px',
-                      fontSize: compactMode ? 10 : 11,
-                      border: '1px solid #ddd',
-                      borderRadius: 3,
-                      backgroundColor: '#fff',
-                      cursor: 'pointer',
-                      color: '#3b82f6',
-                    }}
+                    size={compactMode ? 'sm' : 'sm'}
+                    variant="outline"
                     title="Edit product"
                   >
                     <EditIcon size={compactMode ? 12 : 14} />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     onClick={() => handleDeleteClick(product)}
-                    style={{
-                      padding: compactMode ? '2px 6px' : '4px 8px',
-                      fontSize: compactMode ? 10 : 11,
-                      border: '1px solid #ddd',
-                      borderRadius: 3,
-                      backgroundColor: '#fff',
-                      cursor: 'pointer',
-                      color: '#e74c3c',
-                    }}
+                    size={compactMode ? 'sm' : 'sm'}
+                    variant="outline"
                     title="Delete product"
+                    className="text-[var(--rubix-destructive)]"
                   >
                     <TrashIcon size={compactMode ? 12 : 14} />
-                  </button>
+                  </Button>
                 </div>
               </td>
             </tr>
@@ -661,244 +664,110 @@ function CreateProductDialog({
     onChange({ ...formData, [field]: value });
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape' && !isCreating) {
-      onClose();
-    }
-  };
-
-  const inputStyle = {
-    width: '100%',
-    padding: '8px',
-    fontSize: 12,
-    border: '1px solid #ddd',
-    borderRadius: 4,
-    fontFamily: 'inherit',
-  };
-
-  const labelStyle = {
-    display: 'block',
-    fontSize: 11,
-    fontWeight: 600,
-    marginBottom: 4,
-    color: '#333',
-  };
-
-  const errorStyle = {
-    fontSize: 10,
-    color: '#e74c3c',
-    marginTop: 4,
-  };
-
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isCreating) {
-          onClose();
-        }
-      }}
-      onKeyDown={handleKeyDown}
-    >
-      <div
-        style={{
-          backgroundColor: '#fff',
-          borderRadius: 8,
-          padding: 24,
-          width: '90%',
-          maxWidth: 480,
-          maxHeight: '90vh',
-          overflow: 'auto',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 20,
-          }}
-        >
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
-            Create Product
-          </h2>
-          <button
-            onClick={onClose}
-            disabled={isCreating}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: 20,
-              cursor: isCreating ? 'not-allowed' : 'pointer',
-              padding: 4,
-              color: '#666',
-            }}
-          >
-            ×
-          </button>
-        </div>
+    <Dialog open={true} onOpenChange={(open: boolean) => !open && !isCreating && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create Product</DialogTitle>
+        </DialogHeader>
 
         {createError && (
-          <div
-            style={{
-              padding: 12,
-              backgroundColor: '#fee',
-              color: '#e74c3c',
-              fontSize: 12,
-              borderRadius: 4,
-              marginBottom: 16,
-            }}
-          >
+          <div className="p-3 bg-[var(--rubix-destructive)]/10 text-[var(--rubix-destructive)] text-sm rounded-[var(--rubix-radius-md)] mb-4">
             {createError}
           </div>
         )}
 
         <form onSubmit={onSubmit}>
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>
-              Name <span style={{ color: '#e74c3c' }}>*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              style={{
-                ...inputStyle,
-                borderColor: formErrors.name ? '#e74c3c' : '#ddd',
-              }}
-              disabled={isCreating}
-              autoFocus
-            />
-            {formErrors.name && <div style={errorStyle}>{formErrors.name}</div>}
+          <div className="space-y-4">
+            <div>
+              <Label>
+                Name <span className="text-[var(--rubix-destructive)]">*</span>
+              </Label>
+              <Input
+                type="text"
+                value={formData.name}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('name', e.target.value)}
+                className={formErrors.name ? 'border-[var(--rubix-destructive)]' : ''}
+                disabled={isCreating}
+                autoFocus
+              />
+              {formErrors.name && (
+                <div className="text-xs text-[var(--rubix-destructive)] mt-1">{formErrors.name}</div>
+              )}
+            </div>
+
+            <div>
+              <Label>
+                Product Code <span className="text-[var(--rubix-destructive)]">*</span>
+              </Label>
+              <Input
+                type="text"
+                value={formData.productCode}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('productCode', e.target.value)}
+                className={formErrors.productCode ? 'border-[var(--rubix-destructive)]' : ''}
+                disabled={isCreating}
+                placeholder="e.g., WP-001"
+              />
+              {formErrors.productCode && (
+                <div className="text-xs text-[var(--rubix-destructive)] mt-1">{formErrors.productCode}</div>
+              )}
+            </div>
+
+            <div>
+              <Label>Description</Label>
+              <textarea
+                value={formData.description}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('description', e.target.value)}
+                className="flex min-h-[60px] w-full rounded-[var(--rubix-radius-md)] border border-[var(--rubix-input)] bg-[var(--rubix-background)] px-3 py-2 text-sm placeholder:text-[var(--rubix-muted-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rubix-ring)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isCreating}
+                placeholder="Optional description"
+              />
+            </div>
+
+            <div>
+              <Label>Status</Label>
+              <select
+                value={formData.status}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('status', e.target.value)}
+                className="flex h-10 w-full rounded-[var(--rubix-radius-md)] border border-[var(--rubix-input)] bg-[var(--rubix-background)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rubix-ring)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isCreating}
+              >
+                <option value="Design">Design</option>
+                <option value="Prototype">Prototype</option>
+                <option value="Production">Production</option>
+                <option value="Discontinued">Discontinued</option>
+              </select>
+            </div>
+
+            <div>
+              <Label>Price</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.price}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('price', e.target.value)}
+                className={formErrors.price ? 'border-[var(--rubix-destructive)]' : ''}
+                disabled={isCreating}
+                placeholder="0.00"
+              />
+              {formErrors.price && (
+                <div className="text-xs text-[var(--rubix-destructive)] mt-1">{formErrors.price}</div>
+              )}
+            </div>
           </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>
-              Product Code <span style={{ color: '#e74c3c' }}>*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.productCode}
-              onChange={(e) => handleChange('productCode', e.target.value)}
-              style={{
-                ...inputStyle,
-                borderColor: formErrors.productCode ? '#e74c3c' : '#ddd',
-              }}
-              disabled={isCreating}
-              placeholder="e.g., WP-001"
-            />
-            {formErrors.productCode && (
-              <div style={errorStyle}>{formErrors.productCode}</div>
-            )}
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Description</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
-              style={{
-                ...inputStyle,
-                minHeight: 60,
-                resize: 'vertical',
-                fontFamily: 'inherit',
-              }}
-              disabled={isCreating}
-              placeholder="Optional description"
-            />
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Status</label>
-            <select
-              value={formData.status}
-              onChange={(e) => handleChange('status', e.target.value)}
-              style={{
-                ...inputStyle,
-                cursor: 'pointer',
-              }}
-              disabled={isCreating}
-            >
-              <option value="Design">Design</option>
-              <option value="Prototype">Prototype</option>
-              <option value="Production">Production</option>
-              <option value="Discontinued">Discontinued</option>
-            </select>
-          </div>
-
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>Price</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.price}
-              onChange={(e) => handleChange('price', e.target.value)}
-              style={{
-                ...inputStyle,
-                borderColor: formErrors.price ? '#e74c3c' : '#ddd',
-              }}
-              disabled={isCreating}
-              placeholder="0.00"
-            />
-            {formErrors.price && <div style={errorStyle}>{formErrors.price}</div>}
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              justifyContent: 'flex-end',
-            }}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isCreating}
-              style={{
-                padding: '8px 16px',
-                fontSize: 12,
-                border: '1px solid #ddd',
-                borderRadius: 4,
-                backgroundColor: '#fff',
-                cursor: isCreating ? 'not-allowed' : 'pointer',
-                color: '#666',
-              }}
-            >
+          <DialogFooter>
+            <Button type="button" onClick={onClose} disabled={isCreating} variant="outline">
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isCreating}
-              style={{
-                padding: '8px 16px',
-                fontSize: 12,
-                border: 'none',
-                borderRadius: 4,
-                backgroundColor: isCreating ? '#93c5fd' : '#3b82f6',
-                color: '#fff',
-                cursor: isCreating ? 'not-allowed' : 'pointer',
-                fontWeight: 500,
-              }}
-            >
+            </Button>
+            <Button type="submit" disabled={isCreating}>
               {isCreating ? 'Creating...' : 'Create Product'}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -915,7 +784,6 @@ interface EditProductDialogProps {
 }
 
 function EditProductDialog({
-  product,
   formData,
   formErrors,
   updateError,
@@ -923,244 +791,115 @@ function EditProductDialog({
   onSubmit,
   onChange,
   onClose,
-  compactMode,
 }: EditProductDialogProps) {
   const handleChange = (field: keyof ProductFormData, value: string) => {
     onChange({ ...formData, [field]: value });
   };
 
-  const inputStyle = {
-    width: '100%',
-    padding: '8px',
-    fontSize: 12,
-    border: '1px solid #ddd',
-    borderRadius: 4,
-    fontFamily: 'inherit',
-  };
-
-  const labelStyle = {
-    display: 'block',
-    fontSize: 11,
-    fontWeight: 600,
-    marginBottom: 4,
-    color: '#333',
-  };
-
-  const errorStyle = {
-    fontSize: 10,
-    color: '#e74c3c',
-    marginTop: 4,
-  };
-
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isUpdating) {
-          onClose();
-        }
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: '#fff',
-          borderRadius: 8,
-          padding: 24,
-          width: '90%',
-          maxWidth: 480,
-          maxHeight: '90vh',
-          overflow: 'auto',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 20,
-          }}
-        >
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
-            Edit Product
-          </h2>
-          <button
-            onClick={onClose}
-            disabled={isUpdating}
-            style={{
-              background: 'none',
-              border: 'none',
-              fontSize: 20,
-              cursor: isUpdating ? 'not-allowed' : 'pointer',
-              padding: 4,
-              color: '#666',
-            }}
-          >
-            ×
-          </button>
-        </div>
+    <Dialog open={true} onOpenChange={(open: boolean) => !open && !isUpdating && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Product</DialogTitle>
+        </DialogHeader>
 
         {updateError && (
-          <div
-            style={{
-              padding: 12,
-              backgroundColor: '#fee',
-              color: '#e74c3c',
-              fontSize: 12,
-              borderRadius: 4,
-              marginBottom: 16,
-            }}
-          >
+          <div className="p-3 bg-[var(--rubix-destructive)]/10 text-[var(--rubix-destructive)] text-sm rounded-[var(--rubix-radius-md)] mb-4">
             {updateError}
           </div>
         )}
 
         <form onSubmit={onSubmit}>
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>
-              Name <span style={{ color: '#e74c3c' }}>*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              style={{
-                ...inputStyle,
-                borderColor: formErrors.name ? '#e74c3c' : '#ddd',
-              }}
-              disabled={isUpdating}
-              autoFocus
-            />
-            {formErrors.name && <div style={errorStyle}>{formErrors.name}</div>}
-          </div>
+          <div className="space-y-4">
+            <div>
+              <Label>
+                Name <span className="text-[var(--rubix-destructive)]">*</span>
+              </Label>
+              <Input
+                type="text"
+                value={formData.name}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('name', e.target.value)}
+                className={formErrors.name ? 'border-[var(--rubix-destructive)]' : ''}
+                disabled={isUpdating}
+                autoFocus
+              />
+              {formErrors.name && (
+                <div className="text-xs text-[var(--rubix-destructive)] mt-1">{formErrors.name}</div>
+              )}
+            </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>
-              Product Code <span style={{ color: '#e74c3c' }}>*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.productCode}
-              onChange={(e) => handleChange('productCode', e.target.value)}
-              style={{
-                ...inputStyle,
-                borderColor: formErrors.productCode ? '#e74c3c' : '#ddd',
-                backgroundColor: '#f5f5f5',
-              }}
-              disabled={true}
-              title="Product code cannot be changed"
-            />
-            {formErrors.productCode && (
-              <div style={errorStyle}>{formErrors.productCode}</div>
-            )}
-            <div style={{ fontSize: 10, color: '#999', marginTop: 4 }}>
-              Product code cannot be changed after creation
+            <div>
+              <Label>
+                Product Code <span className="text-[var(--rubix-destructive)]">*</span>
+              </Label>
+              <Input
+                type="text"
+                value={formData.productCode}
+                className={`${formErrors.productCode ? 'border-[var(--rubix-destructive)]' : ''} bg-[var(--rubix-muted)]`}
+                disabled={true}
+                title="Product code cannot be changed"
+              />
+              {formErrors.productCode && (
+                <div className="text-xs text-[var(--rubix-destructive)] mt-1">{formErrors.productCode}</div>
+              )}
+              <div className="text-xs text-[var(--rubix-muted-foreground)] mt-1">
+                Product code cannot be changed after creation
+              </div>
+            </div>
+
+            <div>
+              <Label>Description</Label>
+              <textarea
+                value={formData.description}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('description', e.target.value)}
+                className="flex min-h-[60px] w-full rounded-[var(--rubix-radius-md)] border border-[var(--rubix-input)] bg-[var(--rubix-background)] px-3 py-2 text-sm placeholder:text-[var(--rubix-muted-foreground)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rubix-ring)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isUpdating}
+              />
+            </div>
+
+            <div>
+              <Label>Status</Label>
+              <select
+                value={formData.status}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('status', e.target.value)}
+                className="flex h-10 w-full rounded-[var(--rubix-radius-md)] border border-[var(--rubix-input)] bg-[var(--rubix-background)] px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--rubix-ring)] disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isUpdating}
+              >
+                <option value="Design">Design</option>
+                <option value="Prototype">Prototype</option>
+                <option value="Production">Production</option>
+                <option value="Discontinued">Discontinued</option>
+              </select>
+            </div>
+
+            <div>
+              <Label>Price</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.price}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('price', e.target.value)}
+                className={formErrors.price ? 'border-[var(--rubix-destructive)]' : ''}
+                disabled={isUpdating}
+              />
+              {formErrors.price && (
+                <div className="text-xs text-[var(--rubix-destructive)] mt-1">{formErrors.price}</div>
+              )}
             </div>
           </div>
 
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Description</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
-              style={{
-                ...inputStyle,
-                minHeight: 60,
-                resize: 'vertical',
-                fontFamily: 'inherit',
-              }}
-              disabled={isUpdating}
-            />
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>Status</label>
-            <select
-              value={formData.status}
-              onChange={(e) => handleChange('status', e.target.value)}
-              style={{
-                ...inputStyle,
-                cursor: 'pointer',
-              }}
-              disabled={isUpdating}
-            >
-              <option value="Design">Design</option>
-              <option value="Prototype">Prototype</option>
-              <option value="Production">Production</option>
-              <option value="Discontinued">Discontinued</option>
-            </select>
-          </div>
-
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>Price</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.price}
-              onChange={(e) => handleChange('price', e.target.value)}
-              style={{
-                ...inputStyle,
-                borderColor: formErrors.price ? '#e74c3c' : '#ddd',
-              }}
-              disabled={isUpdating}
-            />
-            {formErrors.price && <div style={errorStyle}>{formErrors.price}</div>}
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: 8,
-              justifyContent: 'flex-end',
-            }}
-          >
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isUpdating}
-              style={{
-                padding: '8px 16px',
-                fontSize: 12,
-                border: '1px solid #ddd',
-                borderRadius: 4,
-                backgroundColor: '#fff',
-                cursor: isUpdating ? 'not-allowed' : 'pointer',
-                color: '#666',
-              }}
-            >
+          <DialogFooter>
+            <Button type="button" onClick={onClose} disabled={isUpdating} variant="outline">
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isUpdating}
-              style={{
-                padding: '8px 16px',
-                fontSize: 12,
-                border: 'none',
-                borderRadius: 4,
-                backgroundColor: isUpdating ? '#93c5fd' : '#3b82f6',
-                color: '#fff',
-                cursor: isUpdating ? 'not-allowed' : 'pointer',
-                fontWeight: 500,
-              }}
-            >
+            </Button>
+            <Button type="submit" disabled={isUpdating}>
               {isUpdating ? 'Updating...' : 'Update Product'}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1177,42 +916,15 @@ function DeleteConfirmDialog({
   isDeleting,
   onConfirm,
   onClose,
-  compactMode,
 }: DeleteConfirmDialogProps) {
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !isDeleting) {
-          onClose();
-        }
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: '#fff',
-          borderRadius: 8,
-          padding: 24,
-          width: '90%',
-          maxWidth: 400,
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, marginBottom: 12 }}>
-          Delete Product
-        </h2>
+    <Dialog open={true} onOpenChange={(open: boolean) => !open && !isDeleting && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete Product</DialogTitle>
+        </DialogHeader>
 
-        <p style={{ fontSize: 13, color: '#666', marginBottom: 20 }}>
+        <p className="text-sm text-[var(--rubix-muted-foreground)]">
           Are you sure you want to delete <strong>{product.name}</strong>
           {product.settings.productCode && (
             <span> ({product.settings.productCode})</span>
@@ -1220,75 +932,32 @@ function DeleteConfirmDialog({
           ? This action cannot be undone.
         </p>
 
-        <div
-          style={{
-            display: 'flex',
-            gap: 8,
-            justifyContent: 'flex-end',
-          }}
-        >
-          <button
-            onClick={onClose}
-            disabled={isDeleting}
-            style={{
-              padding: '8px 16px',
-              fontSize: 12,
-              border: '1px solid #ddd',
-              borderRadius: 4,
-              backgroundColor: '#fff',
-              cursor: isDeleting ? 'not-allowed' : 'pointer',
-              color: '#666',
-            }}
-          >
+        <DialogFooter>
+          <Button onClick={onClose} disabled={isDeleting} variant="outline">
             Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={isDeleting}
-            style={{
-              padding: '8px 16px',
-              fontSize: 12,
-              border: 'none',
-              borderRadius: 4,
-              backgroundColor: isDeleting ? '#f8a5a5' : '#e74c3c',
-              color: '#fff',
-              cursor: isDeleting ? 'not-allowed' : 'pointer',
-              fontWeight: 500,
-            }}
-          >
+          </Button>
+          <Button onClick={onConfirm} disabled={isDeleting} variant="destructive">
             {isDeleting ? 'Deleting...' : 'Delete'}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function StatusBadge({ status, compact }: { status?: string; compact?: boolean }) {
-  const colors: Record<string, string> = {
-    Design: '#3b82f6',
-    Prototype: '#f59e0b',
-    Production: '#10b981',
-    Discontinued: '#6b7280',
+function StatusBadge({ status }: { status?: string }) {
+  const variantMap: Record<string, 'default' | 'warning' | 'success' | 'secondary'> = {
+    Design: 'default',
+    Prototype: 'warning',
+    Production: 'success',
+    Discontinued: 'secondary',
   };
 
-  const color = colors[status || ''] || '#6b7280';
-  const fontSize = compact ? 10 : 11;
-  const padding = compact ? '1px 6px' : '2px 8px';
+  const variant = variantMap[status || ''] || 'secondary';
 
   return (
-    <span
-      style={{
-        display: 'inline-block',
-        padding,
-        borderRadius: 4,
-        fontSize,
-        fontWeight: 500,
-        backgroundColor: `${color}20`,
-        color,
-      }}
-    >
+    <Badge variant={variant}>
       {status || 'Unknown'}
-    </span>
+    </Badge>
   );
 }

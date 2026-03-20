@@ -1,0 +1,27 @@
+{
+  "name": "@rubix/plugin-ui",
+  "version": "1.0.0",
+  "description": "Reusable UI components and utilities for Rubix plugins",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./styles.css": "./styles/styles.css",
+    "./plugin-client": "./plugin-client/index.ts",
+    "./types": "./types/index.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "keywords": [
+    "rubix",
+    "plugin",
+    "ui",
+    "components",
+    "sdk"
+  ],
+  "author": "Rubix",
+  "license": "MIT"
+}
