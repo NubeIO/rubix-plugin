@@ -1,7 +1,7 @@
 package natslib
 
 import (
-	"github.com/NubeDev/rubix-plugin/natssubject"
+	"github.com/NubeIO/rubix-plugin/natssubject"
 )
 
 // PluginClient combines a NATS client with a subject builder for convenience

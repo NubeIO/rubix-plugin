@@ -2,10 +2,9 @@ module github.com/NubeIO/rubix-plm-plugin
 
 go 1.24.6
 
-require github.com/NubeDev/rubix-plugin v0.0.0
+require github.com/NubeIO/rubix-plugin v0.0.0
 
 require (
-	github.com/NubeIO/rubix-plugin v0.0.0-20260320034042-6f3e278653eb // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -21,4 +20,4 @@ require (
 )
 
 // Use local rubix-plugin library
-replace github.com/NubeDev/rubix-plugin => /home/user/code/go/nube/rubix-plugin
+replace github.com/NubeIO/rubix-plugin => /home/user/code/go/nube/rubix-plugin

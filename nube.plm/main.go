@@ -7,8 +7,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/NubeIO/rubix-plm-plugin/internal/hooks"
 	"github.com/NubeIO/rubix-plm-plugin/internal/nodes"
 	"github.com/NubeIO/rubix-plugin/natslib"
+	"github.com/NubeIO/rubix-plugin/nodehooks"
 	"github.com/NubeIO/rubix-plugin/pluginnode"
 	"github.com/rs/zerolog"
 )
@@ -75,7 +77,16 @@ func main() {
 	}
 	defer server.Close()
 
-	logger.Info().Msg("PLM plugin started — product nodes ready")
+	// Register node CRUD hooks via NATS
+	plmHooks := hooks.NewPLMNodeHooks()
+	hookSubjects := nodehooks.NewSubjectBuilder(*prefix, *orgID, *deviceID, *vendor, *pluginName)
+	hookHandler := nodehooks.NewNATSHandler(plmHooks, nc, hookSubjects)
+	if err := hookHandler.RegisterAll(); err != nil {
+		logger.Fatal().Err(err).Msg("failed to register node hooks")
+	}
+	defer hookHandler.Unsubscribe()
+
+	logger.Info().Msg("PLM plugin started — product nodes ready + CRUD hooks active")
 
 	// Wait for shutdown signal
 	sigCh := make(chan os.Signal, 1)
