@@ -92,3 +92,28 @@ func (sb *SubjectBuilder) NodeControlWildcard() string {
 func (sb *SubjectBuilder) Wildcard() string {
 	return sb.RPCWildcard()
 }
+
+// ============================================================
+// Widget subjects (for plugins with frontend widgets)
+// ============================================================
+
+// NOTE: Widget discovery is done via filesystem (plugin.json), not NATS.
+// Only widget backend calls (Type B widgets) use NATS.
+
+// WidgetsCall returns the subject for widget backend calls.
+// Plugin should subscribe to WidgetsCallWildcard and respond with WidgetCallResponse.
+//
+// Subject: {prefix}.{orgId}.{deviceId}.plugin.{vendor}.{name}.widgets.call.{widgetId}
+func (sb *SubjectBuilder) WidgetsCall(widgetID string) string {
+	return fmt.Sprintf("%s.%s.%s.plugin.%s.%s.widgets.call.%s",
+		sb.prefix, sb.orgID, sb.deviceID, sb.vendor, sb.pluginName, widgetID)
+}
+
+// WidgetsCallWildcard returns the subscription pattern for all widget calls.
+// Plugin subscribes to this to handle all widget actions (Type B widgets).
+//
+// Pattern: {prefix}.{orgId}.{deviceId}.plugin.{vendor}.{name}.widgets.call.*
+func (sb *SubjectBuilder) WidgetsCallWildcard() string {
+	return fmt.Sprintf("%s.%s.%s.plugin.%s.%s.widgets.call.*",
+		sb.prefix, sb.orgID, sb.deviceID, sb.vendor, sb.pluginName)
+}

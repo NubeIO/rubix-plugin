@@ -10,8 +10,10 @@ export default defineConfig({
       name: 'nube_taskmanager',
       filename: 'remoteEntry.js',
       exposes: {
-        './Page':   './src/Page.tsx',
-        './Widget': './src/Widget.tsx',
+        './Page':              './src/Page.tsx',
+        './Widget':            './src/Widget.tsx',
+        './ProjectListWidget': './src/ProjectListWidget.tsx',
+        './TaskListWidget':    './src/TaskListWidget.tsx',
       },
       shared: {
         react: { singleton: true },
@@ -19,6 +21,7 @@ export default defineConfig({
       },
     }),
   ],
+  base: '/api/v1/ext/nube.taskmanager/',
   build: {
     // Output to dist-frontend/ at the plugin root (next to plugin.json).
     outDir: '../dist-frontend',

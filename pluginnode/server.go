@@ -222,6 +222,8 @@ func (ps *PluginServer) handleRPC(msg *nats.Msg) {
 	switch req.Method {
 	case MethodInit:
 		resp, err = ps.handleInit(req)
+	case MethodGetSchema:
+		resp, err = ps.handleGetSchema(req)
 	case MethodProcess:
 		resp, err = ps.handleProcess(req)
 	case MethodClose:
@@ -289,6 +291,29 @@ func (ps *PluginServer) handleInit(req RPCRequest) (RPCResponse, error) {
 	return RPCResponse{Success: true, Data: InitResponse{
 		Inputs:         inputs,
 		Outputs:        outputs,
+		SettingsSchema: schema,
+	}}, nil
+}
+
+func (ps *PluginServer) handleGetSchema(req RPCRequest) (RPCResponse, error) {
+	var schemaReq GetSchemaRequest
+	if err := remarshal(req.Payload, &schemaReq); err != nil {
+		return RPCResponse{}, fmt.Errorf("parse getSchema payload: %w", err)
+	}
+
+	// Create temporary node instance just to get schema (don't call Init)
+	node := ps.cfg.Factory(schemaReq.NodeType)
+	if node == nil {
+		return RPCResponse{}, fmt.Errorf("unknown node type: %s", schemaReq.NodeType)
+	}
+
+	// Extract schema if the node provides one
+	var schema map[string]interface{}
+	if sp, ok := node.(SettingsSchemaProvider); ok {
+		schema = sp.SettingsSchema()
+	}
+
+	return RPCResponse{Success: true, Data: GetSchemaResponse{
 		SettingsSchema: schema,
 	}}, nil
 }

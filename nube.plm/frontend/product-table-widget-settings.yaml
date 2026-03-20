@@ -1,0 +1,66 @@
+# Product Table Widget - Settings Schema
+# Plugin: nube.plm
+# Widget ID: product-table-widget
+# Type: Query-based widget (Type A - no backend needed)
+
+schema:
+  type: object
+  properties:
+    # Display Settings
+    display:
+      type: object
+      title: Display Settings
+      description: Configure what columns to show
+      properties:
+        showCode:
+          type: boolean
+          title: Show Product Code
+          description: Display product code column
+          default: true
+        showDescription:
+          type: boolean
+          title: Show Description
+          description: Display description column
+          default: false
+        showStatus:
+          type: boolean
+          title: Show Status
+          description: Display status badge column
+          default: true
+        showPrice:
+          type: boolean
+          title: Show Price
+          description: Display price column
+          default: true
+
+    # Data Refresh Settings
+    refresh:
+      type: object
+      title: Refresh Settings
+      description: Configure data refresh behavior
+      properties:
+        interval:
+          type: number
+          title: Refresh Interval (seconds)
+          description: How often to reload product data
+          default: 30
+          minimum: 5
+          maximum: 300
+        enableAutoRefresh:
+          type: boolean
+          title: Enable Auto-Refresh
+          description: Automatically refresh data at interval
+          default: true
+
+  required: []
+
+# Default configuration
+defaults:
+  display:
+    showCode: true
+    showDescription: false
+    showStatus: true
+    showPrice: true
+  refresh:
+    interval: 30
+    enableAutoRefresh: true

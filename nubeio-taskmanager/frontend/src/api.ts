@@ -84,6 +84,18 @@ export async function listTasks(
   return (await checkOk(res)) as any[];
 }
 
+export async function listAllTasks(
+  baseUrl: string, orgId: string, deviceId: string, token: string | undefined,
+  limit?: number
+): Promise<any[]> {
+  let url = base(baseUrl, orgId, deviceId, 'tasks');
+  if (limit) {
+    url += `?limit=${limit}&orderBy=created_at`;
+  }
+  const res = await fetch(url, { headers: authHeaders(token) });
+  return (await checkOk(res)) as any[];
+}
+
 export async function createTask(
   baseUrl: string, orgId: string, deviceId: string, token: string | undefined,
   data: {

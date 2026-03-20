@@ -9,10 +9,11 @@ package pluginnode
 type RPCMethod string
 
 const (
-	MethodInit    RPCMethod = "init"
-	MethodProcess RPCMethod = "process"
-	MethodClose   RPCMethod = "close"
-	MethodPing    RPCMethod = "ping"
+	MethodInit      RPCMethod = "init"
+	MethodProcess   RPCMethod = "process"
+	MethodClose     RPCMethod = "close"
+	MethodPing      RPCMethod = "ping"
+	MethodGetSchema RPCMethod = "getSchema" // Fetch settings schema without initializing node
 )
 
 // RPCRequest is the envelope rubix sends via NATS request/reply.
@@ -85,6 +86,20 @@ type InitRequest struct {
 type InitResponse struct {
 	Inputs         []NodePort             `json:"inputs"`
 	Outputs        []NodePort             `json:"outputs"`
+	SettingsSchema map[string]interface{} `json:"settingsSchema,omitempty"`
+}
+
+// ============================================================
+// GetSchema (fetch schema without initializing)
+// ============================================================
+
+// GetSchemaRequest payload for MethodGetSchema.
+type GetSchemaRequest struct {
+	NodeType string `json:"nodeType"`
+}
+
+// GetSchemaResponse returns the settings schema without initializing a node.
+type GetSchemaResponse struct {
 	SettingsSchema map[string]interface{} `json:"settingsSchema,omitempty"`
 }
 

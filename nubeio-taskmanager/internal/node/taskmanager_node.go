@@ -107,12 +107,139 @@ func (n *TaskManagerNode) SettingsSchema() map[string]interface{} {
 	return map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
+			// Legacy field for node type (flow runtime)
 			"refresh_interval": map[string]interface{}{
 				"type":        "number",
 				"title":       "Refresh Interval (seconds)",
 				"description": "How often to poll for task stats",
 				"default":     30,
 				"minimum":     5,
+			},
+			// Widget settings (for dashboard widgets)
+			"display": map[string]interface{}{
+				"type":        "object",
+				"title":       "Display Settings",
+				"description": "Configure what information to show in the widget",
+				"properties": map[string]interface{}{
+					"showProjects": map[string]interface{}{
+						"type":        "boolean",
+						"title":       "Show Projects Count",
+						"description": "Display the total number of projects",
+						"default":     true,
+					},
+					"showTotalTasks": map[string]interface{}{
+						"type":        "boolean",
+						"title":       "Show Total Tasks",
+						"description": "Display the total number of tasks across all projects",
+						"default":     true,
+					},
+					"showActiveBreakdown": map[string]interface{}{
+						"type":        "boolean",
+						"title":       "Show Active/Done Breakdown",
+						"description": "Display separate counts for active and completed tasks",
+						"default":     true,
+					},
+					"compactMode": map[string]interface{}{
+						"type":        "boolean",
+						"title":       "Compact Mode",
+						"description": "Reduce padding and font sizes for a more condensed display",
+						"default":     false,
+					},
+				},
+			},
+			"refresh": map[string]interface{}{
+				"type":        "object",
+				"title":       "Refresh Settings",
+				"description": "Configure how often the widget fetches new data",
+				"properties": map[string]interface{}{
+					"interval": map[string]interface{}{
+						"type":        "number",
+						"title":       "Refresh Interval (seconds)",
+						"description": "How often to poll for new data (minimum 5 seconds)",
+						"default":     30,
+						"minimum":     5,
+						"maximum":     3600,
+					},
+					"enableAutoRefresh": map[string]interface{}{
+						"type":        "boolean",
+						"title":       "Enable Auto-Refresh",
+						"description": "Automatically refresh data at the specified interval",
+						"default":     true,
+					},
+				},
+			},
+			"appearance": map[string]interface{}{
+				"type":        "object",
+				"title":       "Appearance",
+				"description": "Customize the visual appearance of the widget",
+				"properties": map[string]interface{}{
+					"theme": map[string]interface{}{
+						"type":        "string",
+						"title":       "Color Theme",
+						"description": "Visual theme for the widget",
+						"enum":        []interface{}{"default", "accent", "success", "warning"},
+						"default":     "default",
+					},
+					"fontSize": map[string]interface{}{
+						"type":        "string",
+						"title":       "Font Size",
+						"description": "Base font size for widget text",
+						"enum":        []interface{}{"small", "medium", "large"},
+						"default":     "medium",
+					},
+					"showIcon": map[string]interface{}{
+						"type":        "boolean",
+						"title":       "Show Icon",
+						"description": "Display clipboard icon in header",
+						"default":     true,
+					},
+				},
+			},
+			"filters": map[string]interface{}{
+				"type":        "object",
+				"title":       "Data Filters",
+				"description": "Filter which data to include in the stats",
+				"properties": map[string]interface{}{
+					"includeArchivedProjects": map[string]interface{}{
+						"type":        "boolean",
+						"title":       "Include Archived Projects",
+						"description": "Count archived projects in statistics",
+						"default":     false,
+					},
+					"includeArchivedTasks": map[string]interface{}{
+						"type":        "boolean",
+						"title":       "Include Archived Tasks",
+						"description": "Count archived tasks in statistics",
+						"default":     false,
+					},
+				},
+			},
+			"advanced": map[string]interface{}{
+				"type":        "object",
+				"title":       "Advanced",
+				"description": "Advanced configuration options",
+				"properties": map[string]interface{}{
+					"enableDebugMode": map[string]interface{}{
+						"type":        "boolean",
+						"title":       "Debug Mode",
+						"description": "Show additional debugging information in console",
+						"default":     false,
+					},
+					"cacheTimeout": map[string]interface{}{
+						"type":        "number",
+						"title":       "Cache Timeout (milliseconds)",
+						"description": "How long to cache data before considering it stale",
+						"default":     30000,
+						"minimum":     1000,
+						"maximum":     300000,
+					},
+					"showLastRefresh": map[string]interface{}{
+						"type":        "boolean",
+						"title":       "Show Last Refresh Time",
+						"description": "Display timestamp of last data refresh",
+						"default":     false,
+					},
+				},
 			},
 		},
 	}

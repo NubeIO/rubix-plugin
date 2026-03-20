@@ -1,0 +1,401 @@
+# Task Stats Widget - Settings Schema
+# Plugin: nube.taskmanager
+# Widget ID: task-stats-widget
+# Type: Query-based widget (Type A)
+#
+# This YAML file defines the settings schema for the Task Stats widget.
+# The schema is used for:
+# 1. Backend validation (JSON Schema conversion)
+# 2. Frontend settings UI generation
+# 3. Documentation and type safety
+
+schema:
+  type: object
+  properties:
+    # Display Settings
+    display:
+      type: object
+      title: Display Settings
+      description: Configure what information to show in the widget
+      properties:
+        showProjects:
+          type: boolean
+          title: Show Projects Count
+          description: Display the total number of projects
+          default: true
+        showTotalTasks:
+          type: boolean
+          title: Show Total Tasks
+          description: Display the total number of tasks across all projects
+          default: true
+        showActiveBreakdown:
+          type: boolean
+          title: Show Active/Done Breakdown
+          description: Display separate counts for active and completed tasks
+          default: true
+        compactMode:
+          type: boolean
+          title: Compact Mode
+          description: Reduce padding and font sizes for a more condensed display
+          default: false
+
+    # Data Refresh Settings
+    refresh:
+      type: object
+      title: Refresh Settings
+      description: Configure how often the widget fetches new data
+      properties:
+        interval:
+          type: number
+          title: Refresh Interval (seconds)
+          description: How often to poll for new data (minimum 5 seconds)
+          default: 30
+          minimum: 5
+          maximum: 3600
+        enableAutoRefresh:
+          type: boolean
+          title: Enable Auto-Refresh
+          description: Automatically refresh data at the specified interval
+          default: true
+
+    # Appearance Settings
+    appearance:
+      type: object
+      title: Appearance
+      description: Customize the visual appearance of the widget
+      properties:
+        theme:
+          type: string
+          title: Color Theme
+          description: Visual theme for the widget
+          enum:
+            - default
+            - accent
+            - success
+            - warning
+          default: default
+          enumTitles:
+            - Default (System)
+            - Accent (Blue)
+            - Success (Green)
+            - Warning (Amber)
+        fontSize:
+          type: string
+          title: Font Size
+          description: Base font size for widget text
+          enum:
+            - small
+            - medium
+            - large
+          default: medium
+          enumTitles:
+            - Small (10px)
+            - Medium (12px)
+            - Large (14px)
+        showIcon:
+          type: boolean
+          title: Show Icon
+          description: Display clipboard icon in header
+          default: true
+
+    # Data Filtering (for future use with query integration)
+    filters:
+      type: object
+      title: Data Filters
+      description: Filter which data to include in the stats
+      properties:
+        includeArchivedProjects:
+          type: boolean
+          title: Include Archived Projects
+          description: Count archived projects in statistics
+          default: false
+        includeArchivedTasks:
+          type: boolean
+          title: Include Archived Tasks
+          description: Count archived tasks in statistics
+          default: false
+        projectIds:
+          type: array
+          title: Specific Projects
+          description: Only show stats for these project IDs (leave empty for all)
+          items:
+            type: string
+          default: []
+
+    # Advanced Settings
+    advanced:
+      type: object
+      title: Advanced
+      description: Advanced configuration options
+      properties:
+        enableDebugMode:
+          type: boolean
+          title: Debug Mode
+          description: Show additional debugging information in console
+          default: false
+        cacheTimeout:
+          type: number
+          title: Cache Timeout (milliseconds)
+          description: How long to cache data before considering it stale
+          default: 30000
+          minimum: 1000
+          maximum: 300000
+        showLastRefresh:
+          type: boolean
+          title: Show Last Refresh Time
+          description: Display timestamp of last data refresh
+          default: false
+
+  # Required fields (minimal - most settings have defaults)
+  required: []
+
+# Default configuration (what gets used if no settings are saved)
+defaults:
+  display:
+    showProjects: true
+    showTotalTasks: true
+    showActiveBreakdown: true
+    compactMode: false
+  refresh:
+    interval: 30
+    enableAutoRefresh: true
+  appearance:
+    theme: default
+    fontSize: medium
+    showIcon: true
+  filters:
+    includeArchivedProjects: false
+    includeArchivedTasks: false
+    projectIds: []
+  advanced:
+    enableDebugMode: false
+    cacheTimeout: 30000
+    showLastRefresh: false
+
+# Example configurations
+examples:
+  minimal:
+    description: Minimal widget with only project and task counts
+    settings:
+      display:
+        showProjects: true
+        showTotalTasks: true
+        showActiveBreakdown: false
+        compactMode: true
+      refresh:
+        interval: 60
+        enableAutoRefresh: true
+
+  detailed:
+    description: Full details with fast refresh and debug info
+    settings:
+      display:
+        showProjects: true
+        showTotalTasks: true
+        showActiveBreakdown: true
+        compactMode: false
+      refresh:
+        interval: 10
+        enableAutoRefresh: true
+      appearance:
+        theme: accent
+        fontSize: large
+        showIcon: true
+      advanced:
+        enableDebugMode: true
+        showLastRefresh: true
+
+  dashboard:
+    description: Optimized for dashboard display (slow refresh, compact)
+    settings:
+      display:
+        showProjects: true
+        showTotalTasks: true
+        showActiveBreakdown: true
+        compactMode: true
+      refresh:
+        interval: 120
+        enableAutoRefresh: true
+      appearance:
+        theme: default
+        fontSize: small
+        showIcon: false
+
+# Validation rules (additional constraints beyond JSON Schema)
+validation:
+  rules:
+    - field: refresh.interval
+      rule: Must be at least 5 seconds to avoid server overload
+      severity: error
+    - field: filters.projectIds
+      rule: Project IDs must be valid UUIDs if specified
+      severity: warning
+    - field: advanced.cacheTimeout
+      rule: Should be less than or equal to refresh interval
+      severity: warning
+
+# Migration notes (for future schema versions)
+migrations:
+  v1_to_v2:
+    description: Initial version - no migrations needed
+    changes: []
+
+# Backend integration notes
+backend:
+  validation:
+    method: SettingsSchema()
+    description: |
+      The backend node implementation should return this schema converted
+      to JSON Schema format via the SettingsSchema() method.
+
+      Example (Go):
+      ```go
+      func (n *TaskManagerNode) SettingsSchema() map[string]interface{} {
+        // Return JSON Schema derived from this YAML
+        return map[string]interface{}{
+          "type": "object",
+          "properties": map[string]interface{}{
+            "refresh": map[string]interface{}{
+              "type": "object",
+              "properties": map[string]interface{}{
+                "interval": map[string]interface{}{
+                  "type": "number",
+                  "minimum": 5,
+                  "maximum": 3600,
+                  "default": 30,
+                },
+              },
+            },
+          },
+        }
+      }
+      ```
+
+  storage:
+    location: Node.settings JSONB column
+    endpoint: /api/v1/orgs/{orgId}/devices/{deviceId}/nodes/{nodeId}/settings
+    method: PUT
+
+# Frontend integration notes
+frontend:
+  hooks:
+    - useWidgetSettings<TaskStatsSettings>({ orgId, deviceId, nodeId })
+    - useWidgetSettingsMutation({ orgId, deviceId, nodeId })
+
+  components:
+    settings_panel: |
+      Create a settings panel component that renders form inputs based on this schema.
+      Use shadcn/ui components (Switch, Select, Input, Slider).
+
+      Example structure:
+      - Tabs: Display, Refresh, Appearance, Advanced
+      - Each section maps to schema properties
+      - Use react-hook-form + zod for validation
+      - Save button triggers useWidgetSettingsMutation
+
+  types:
+    typescript: |
+      // Auto-generate from this schema
+      interface TaskStatsSettings {
+        display?: {
+          showProjects?: boolean;
+          showTotalTasks?: boolean;
+          showActiveBreakdown?: boolean;
+          compactMode?: boolean;
+        };
+        refresh?: {
+          interval?: number;
+          enableAutoRefresh?: boolean;
+        };
+        appearance?: {
+          theme?: 'default' | 'accent' | 'success' | 'warning';
+          fontSize?: 'small' | 'medium' | 'large';
+          showIcon?: boolean;
+        };
+        filters?: {
+          includeArchivedProjects?: boolean;
+          includeArchivedTasks?: boolean;
+          projectIds?: string[];
+        };
+        advanced?: {
+          enableDebugMode?: boolean;
+          cacheTimeout?: number;
+          showLastRefresh?: boolean;
+        };
+      }
+
+# Documentation
+docs:
+  user_guide: |
+    ## Task Stats Widget Settings
+
+    ### Display Settings
+    Control what information is shown in the widget:
+    - **Show Projects Count**: Toggle project count display
+    - **Show Total Tasks**: Toggle total task count display
+    - **Show Active/Done Breakdown**: Toggle separate active/done counts
+    - **Compact Mode**: Reduce widget size for dense dashboards
+
+    ### Refresh Settings
+    Configure how often the widget updates:
+    - **Refresh Interval**: Time between data fetches (5-3600 seconds)
+    - **Enable Auto-Refresh**: Toggle automatic data updates
+
+    ### Appearance
+    Customize the visual style:
+    - **Color Theme**: Choose from Default, Accent, Success, Warning
+    - **Font Size**: Small (10px), Medium (12px), or Large (14px)
+    - **Show Icon**: Toggle clipboard icon in header
+
+    ### Advanced
+    Power user settings:
+    - **Debug Mode**: Enable console logging for troubleshooting
+    - **Cache Timeout**: How long to cache data before refetching
+    - **Show Last Refresh**: Display timestamp of last update
+
+  developer_guide: |
+    ## Implementing Settings in Widget Component
+
+    1. **Fetch settings on mount**:
+       ```tsx
+       const { data: settings } = useWidgetSettings<TaskStatsSettings>({
+         orgId, deviceId, nodeId
+       });
+       ```
+
+    2. **Apply settings to component**:
+       ```tsx
+       const pollInterval = (settings?.refresh?.interval ?? 30) * 1000;
+       const autoRefresh = settings?.refresh?.enableAutoRefresh ?? true;
+
+       useEffect(() => {
+         if (!autoRefresh) return;
+         const id = setInterval(load, pollInterval);
+         return () => clearInterval(id);
+       }, [autoRefresh, pollInterval]);
+       ```
+
+    3. **Conditional rendering based on settings**:
+       ```tsx
+       {settings?.display?.showProjects && (
+         <div>Projects: {stats.projects}</div>
+       )}
+       ```
+
+    4. **Apply appearance settings**:
+       ```tsx
+       const fontSize = settings?.appearance?.fontSize === 'small' ? 10 :
+                        settings?.appearance?.fontSize === 'large' ? 14 : 12;
+
+       <div style={{ fontSize }}>...</div>
+       ```
+
+# Change Log
+changelog:
+  - version: 1.0.0
+    date: 2026-03-20
+    changes:
+      - Initial schema definition
+      - Added display, refresh, appearance, filters, and advanced sections
+      - Defined validation rules and default values
+      - Created example configurations
