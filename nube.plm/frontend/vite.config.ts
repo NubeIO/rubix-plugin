@@ -12,7 +12,7 @@ export default defineConfig({
       name: 'nube_plm',
       filename: 'remoteEntry.js',
       exposes: {
-        './ProductTableWidget': './src/widgets/ProductTableWidget.tsx',
+        './ProductTableWidget': './src/products/widget/ProductTableWidget.tsx',
       },
       shared: {
         react: {

@@ -6,9 +6,28 @@
   "version": "1.0.0",
   "description": "Product management system",
   "category": "manufacturing",
-  "nodeTypes": ["plm.product"],
+  "nodeTypes": [
+    "plm.service",
+    "plm.products",
+    "plm.product"
+  ],
+  "_futureNodeTypes": [
+    "plm.production-runs",
+    "plm.production-run",
+    "plm.serialized-units",
+    "plm.serialized-unit",
+    "plm.work-items",
+    "plm.work-item",
+    "plm.sites",
+    "plm.site"
+  ],
   "policy": {
-    "nodeTypes": ["plm.product"],
+    "nodeTypes": [
+      "plm.service",
+      "plm.products",
+      "plm.product"
+    ],
+    "_comment": "Add other node types here when implementing additional collections",
     "hooks": {
       "enabled": true,
       "endpoint": "/hooks/nodes",

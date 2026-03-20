@@ -1,15 +1,19 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	plmBootstrap "github.com/NubeIO/rubix-plm-plugin/internal/bootstrap"
 	"github.com/NubeIO/rubix-plm-plugin/internal/hooks"
 	"github.com/NubeIO/rubix-plm-plugin/internal/nodes"
+	"github.com/NubeIO/rubix-plugin/bootstrap"
 	"github.com/NubeIO/rubix-plugin/natslib"
+	"github.com/NubeIO/rubix-plugin/natssubject"
 	"github.com/NubeIO/rubix-plugin/nodehooks"
 	"github.com/NubeIO/rubix-plugin/pluginnode"
 	"github.com/rs/zerolog"
@@ -49,9 +53,47 @@ func main() {
 	defer nc.Close()
 	logger.Info().Msg("connected to NATS")
 
+	// Bootstrap PLM hierarchy (service + collections)
+	sb := natssubject.NewBuilder(*prefix, *orgID, *deviceID, "main")
+	bootstrapClient := &bootstrap.Client{
+		NC:      nc,
+		Subject: sb,
+	}
+
+	// Wait for rubix core to be ready, then bootstrap hierarchy
+	logger.Info().Msg("waiting for rubix core to be ready...")
+
+	retryCallback := func(attempt int, nextDelay time.Duration) {
+		logger.Info().
+			Int("attempt", attempt).
+			Str("nextRetry", nextDelay.String()).
+			Msg("rubix core not ready, retrying...")
+	}
+
+	// Wait up to 5 minutes for server (0 = wait forever)
+	maxWait := 5 * time.Minute
+
+	logger.Info().Msg("bootstrapping PLM hierarchy...")
+	ctx, cancel := context.WithTimeout(context.Background(), maxWait+30*time.Second)
+	defer cancel()
+
+	hierarchyIDs, err := plmBootstrap.EnsurePLMHierarchyWithRetry(ctx, bootstrapClient, maxWait, retryCallback)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to bootstrap PLM hierarchy - plugin will start but nodes may not be initialized")
+	} else {
+		logger.Info().
+			Str("serviceId", hierarchyIDs["service"]).
+			Str("productsId", hierarchyIDs["products"]).
+			Msg("✅ PLM hierarchy ready")
+	}
+
 	// Node factory
 	factory := func(nodeType string) pluginnode.PluginNode {
 		switch nodeType {
+		case "plm.service":
+			return &nodes.PLMServiceNode{}
+		case "plm.products":
+			return &nodes.ProductsCollectionNode{}
 		case "plm.product":
 			return &nodes.ProductNode{}
 		default:

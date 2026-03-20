@@ -12,7 +12,6 @@ import '@rubix/sdk/globals.css';
 
 import { Product } from '../common/types';
 import { useProducts } from '../common/hooks';
-import { usePLMService } from '../../shared/hooks/use-plm-service';
 import { PlusIcon } from '../../shared/components/icons';
 import { ProductTable } from '../components';
 import { CreateProductDialog, EditProductDialog, DeleteProductDialog } from '../dialogs';
@@ -56,11 +55,7 @@ export default function ProductTableWidget({
   const interval = (settings?.refresh?.interval ?? 30) * 1000;
   const autoRefresh = settings?.refresh?.enableAutoRefresh ?? true;
 
-  // PLM service initialization
-  const clientConfig = orgId && deviceId ? { orgId, deviceId, baseUrl, token } : null;
-  const { plmServiceId, loading: plmLoading, error: plmError } = usePLMService(clientConfig);
-
-  // Products CRUD
+  // Products CRUD (includes PLM hierarchy initialization)
   const {
     products,
     loading: productsLoading,
@@ -68,12 +63,14 @@ export default function ProductTableWidget({
     createProduct,
     updateProduct,
     deleteProduct,
+    productsCollectionId,
+    hierarchyLoading,
+    hierarchyError,
   } = useProducts({
     orgId: orgId || '',
     deviceId: deviceId || '',
     baseUrl,
     token,
-    plmServiceId,
     autoRefresh,
     refreshInterval: interval,
   });
@@ -84,9 +81,9 @@ export default function ProductTableWidget({
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
 
   // Computed
-  const canCreate = !!(orgId && deviceId && baseUrl && plmServiceId);
-  const loading = plmLoading || productsLoading;
-  const error = plmError || productsError;
+  const canCreate = !!(orgId && deviceId && baseUrl && productsCollectionId);
+  const loading = hierarchyLoading || productsLoading;
+  const error = hierarchyError || productsError;
 
   const displaySettings = {
     showCode,

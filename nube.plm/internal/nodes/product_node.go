@@ -3,6 +3,7 @@ package nodes
 import (
 	"context"
 
+	"github.com/NubeIO/rubix-plugin/nodedeps"
 	"github.com/NubeIO/rubix-plugin/pluginnode"
 )
 
@@ -40,6 +41,17 @@ func (n *ProductNode) OnInputUpdated(portID string, val pluginnode.PortValue) {
 func (n *ProductNode) Process(ctx context.Context, inputs map[string]pluginnode.PortValue) (map[string]pluginnode.PortValue, error) {
 	// No processing needed in Phase 1
 	return nil, nil
+}
+
+// GetConstraints defines product as record under products collection
+func (n *ProductNode) GetConstraints() nodedeps.NodeConstraints {
+	return nodedeps.NodeConstraints{
+		MaxOneNode:          false, // Multiple products allowed
+		DeletionProhibited:  false,
+		AllowCascadeDelete:  false, // Products have no children (yet)
+		MustLiveUnderParent: true,
+		AllowedParents:      []string{"plm.products"},
+	}
 }
 
 // SettingsSchema returns the JSON Schema for product settings
