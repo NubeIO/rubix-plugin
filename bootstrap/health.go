@@ -11,7 +11,7 @@ import (
 // WaitForServer waits for rubix core to be ready (delegates to natslib)
 // Deprecated: Use natslib.Client.WaitForServer directly for more control
 func WaitForServer(ctx context.Context, client *Client, maxWait time.Duration, onRetry func(attempt int, nextDelay time.Duration)) error {
-	subject := client.Subject.Build("query")
+	subject := client.Subject.Build("query", "create")
 	return client.NC.WaitForServer(ctx, natslib.WaitForServerOpts{
 		Subject: subject,
 		MaxWait: maxWait,

@@ -10,8 +10,10 @@ import (
 
 // EnsurePLMHierarchy creates PLM service + collections (idempotent)
 // Returns map of collection IDs: {"service": "...", "products": "...", "productionRuns": "..."}
-func EnsurePLMHierarchy(ctx context.Context, client *pluginBootstrap.Client) (map[string]string, error) {
+// pluginNodeID: ID of the plugin node (e.g., "plugin_nube.plm")
+func EnsurePLMHierarchy(ctx context.Context, client *pluginBootstrap.Client, pluginNodeID string) (map[string]string, error) {
 	spec := pluginBootstrap.HierarchySpec{
+		PluginNodeID: pluginNodeID,
 		ServiceNode: pluginBootstrap.NodeSpec{
 			Type: "plm.service",
 			Name: "PLM System",
@@ -78,8 +80,10 @@ func EnsurePLMHierarchy(ctx context.Context, client *pluginBootstrap.Client) (ma
 }
 
 // EnsurePLMHierarchyWithRetry creates PLM hierarchy with retry (waits for rubix core)
-func EnsurePLMHierarchyWithRetry(ctx context.Context, client *pluginBootstrap.Client, maxWait time.Duration, onRetry func(attempt int, nextDelay time.Duration)) (map[string]string, error) {
+// pluginNodeID: ID of the plugin node (e.g., "plugin_nube.plm")
+func EnsurePLMHierarchyWithRetry(ctx context.Context, client *pluginBootstrap.Client, pluginNodeID string, maxWait time.Duration, onRetry func(attempt int, nextDelay time.Duration)) (map[string]string, error) {
 	spec := pluginBootstrap.HierarchySpec{
+		PluginNodeID: pluginNodeID,
 		ServiceNode: pluginBootstrap.NodeSpec{
 			Type: "plm.service",
 			Name: "PLM System",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type ServerStatus struct {
 
 // CheckServerReady pings rubix core to see if it's responding
 // Sends a simple query request and checks for response
+// Subject should be built as: client.Subject.Build("query", "create")
 func (c *Client) CheckServerReady(ctx context.Context, subject string) (*ServerStatus, error) {
 	status := &ServerStatus{
 		Ready:     false,
@@ -24,11 +26,31 @@ func (c *Client) CheckServerReady(ctx context.Context, subject string) (*ServerS
 		CheckedAt: time.Now(),
 	}
 
-	// Try a simple query - if it responds, server is ready
-	reqData, err := json.Marshal(map[string]interface{}{
-		"filter": "type is \"rubix.device\"",
-		"limit":  1,
-	})
+	// Extract org and device IDs from subject for envelope
+	// Subject format: rubix.v1.{scope}.{orgId}.{deviceId}.*.query.create
+	parts := strings.Split(subject, ".")
+	if len(parts) < 6 {
+		status.Message = "invalid subject format"
+		return status, fmt.Errorf("invalid subject format: %s", subject)
+	}
+	orgID := parts[3]
+	deviceID := parts[4]
+
+	// Wrap in NATS envelope (required by gateway's NATS subscriber)
+	envelope := map[string]interface{}{
+		"method": "POST",
+		"path":   fmt.Sprintf("/api/v1/orgs/%s/devices/%s/query", orgID, deviceID),
+		"params": map[string]string{
+			"orgId":    orgID,
+			"deviceId": deviceID,
+		},
+		"body": map[string]interface{}{
+			"filter": "type is \"auth.org\"", // Simple ping - check for org node
+			"limit":  1,
+		},
+	}
+
+	reqData, err := json.Marshal(envelope)
 	if err != nil {
 		status.Message = "failed to marshal ping request"
 		return status, err
@@ -41,11 +63,15 @@ func (c *Client) CheckServerReady(ctx context.Context, subject string) (*ServerS
 		return status, err
 	}
 
-	// If we got a response, server is ready
-	var result struct {
-		Data []interface{} `json:"data"`
+	// NATS response wraps HTTP response
+	var natsResponse struct {
+		Data struct {
+			Data []interface{}          `json:"data"`
+			Meta map[string]interface{} `json:"meta"`
+		} `json:"data"`
+		Status int `json:"status"`
 	}
-	if err := json.Unmarshal(respData, &result); err != nil {
+	if err := json.Unmarshal(respData, &natsResponse); err != nil {
 		status.Ping = true
 		status.Message = "got response but invalid format"
 		return status, err

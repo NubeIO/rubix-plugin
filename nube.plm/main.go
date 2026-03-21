@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -53,8 +54,56 @@ func main() {
 	defer nc.Close()
 	logger.Info().Msg("connected to NATS")
 
+	// Register node CRUD hooks via NATS FIRST (before bootstrap)
+	// This is required because bootstrap creates nodes, which triggers hooks
+	logger.Info().Msg("registering node hooks...")
+	plmHooks := hooks.NewPLMNodeHooks()
+	hookSubjects := nodehooks.NewSubjectBuilder(*prefix, *orgID, *deviceID, *vendor, *pluginName)
+	hookHandler := nodehooks.NewNATSHandler(plmHooks, nc, hookSubjects)
+	if err := hookHandler.RegisterAll(); err != nil {
+		logger.Fatal().Err(err).Msg("failed to register node hooks")
+	}
+	defer hookHandler.Unsubscribe()
+
+	// Node factory
+	factory := func(nodeType string) pluginnode.PluginNode {
+		switch nodeType {
+		case "plm.service":
+			return &nodes.PLMServiceNode{}
+		case "plm.products":
+			return &nodes.ProductsCollectionNode{}
+		case "plm.product":
+			return &nodes.ProductNode{}
+		default:
+			return nil
+		}
+	}
+
+	// Start the plugin server BEFORE bootstrap
+	// This ensures RPC handlers are ready when bootstrap creates nodes (which may trigger hooks/RPC)
+	server, err := pluginnode.NewPluginServer(pluginnode.PluginServerConfig{
+		NATSClient:     nc,
+		Prefix:         *prefix,
+		OrgID:          *orgID,
+		DeviceID:       *deviceID,
+		Vendor:         *vendor,
+		PluginName:     *pluginName,
+		Version:        "1.0.0",
+		Factory:        factory,
+		Logger:         logger,
+		AutoStartNodes: true,
+	})
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to create plugin server")
+	}
+	defer server.Close()
+
+	logger.Info().Msg("plugin server started — ready to handle RPC and hooks")
+
 	// Bootstrap PLM hierarchy (service + collections)
-	sb := natssubject.NewBuilder(*prefix, *orgID, *deviceID, "main")
+	// Use "*" for flowId because nodes endpoints don't include flowId in their URL path
+	// RAS routing expects: rubix.v1.{scope}.{orgId}.{deviceId}.*.nodes.create
+	sb := natssubject.NewBuilder(*prefix, *orgID, *deviceID, "*")
 	bootstrapClient := &bootstrap.Client{
 		NC:      nc,
 		Subject: sb,
@@ -73,11 +122,16 @@ func main() {
 	// Wait up to 5 minutes for server (0 = wait forever)
 	maxWait := 5 * time.Minute
 
+	// Construct plugin node ID (pattern: plugin_{vendor}.{name})
+	// This is the auto-created node that represents this plugin in the tree
+	pluginNodeID := fmt.Sprintf("plugin_%s.%s", *vendor, *pluginName)
+	logger.Info().Str("pluginNodeId", pluginNodeID).Msg("plugin node ID")
+
 	logger.Info().Msg("bootstrapping PLM hierarchy...")
 	ctx, cancel := context.WithTimeout(context.Background(), maxWait+30*time.Second)
 	defer cancel()
 
-	hierarchyIDs, err := plmBootstrap.EnsurePLMHierarchyWithRetry(ctx, bootstrapClient, maxWait, retryCallback)
+	hierarchyIDs, err := plmBootstrap.EnsurePLMHierarchyWithRetry(ctx, bootstrapClient, pluginNodeID, maxWait, retryCallback)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to bootstrap PLM hierarchy - plugin will start but nodes may not be initialized")
 	} else {
@@ -86,47 +140,6 @@ func main() {
 			Str("productsId", hierarchyIDs["products"]).
 			Msg("✅ PLM hierarchy ready")
 	}
-
-	// Node factory
-	factory := func(nodeType string) pluginnode.PluginNode {
-		switch nodeType {
-		case "plm.service":
-			return &nodes.PLMServiceNode{}
-		case "plm.products":
-			return &nodes.ProductsCollectionNode{}
-		case "plm.product":
-			return &nodes.ProductNode{}
-		default:
-			return nil
-		}
-	}
-
-	// Start the plugin server
-	server, err := pluginnode.NewPluginServer(pluginnode.PluginServerConfig{
-		NATSClient:     nc,
-		Prefix:         *prefix,
-		OrgID:          *orgID,
-		DeviceID:       *deviceID,
-		Vendor:         *vendor,
-		PluginName:     *pluginName,
-		Version:        "1.0.0",
-		Factory:        factory,
-		Logger:         logger,
-		AutoStartNodes: true,
-	})
-	if err != nil {
-		logger.Fatal().Err(err).Msg("failed to create plugin server")
-	}
-	defer server.Close()
-
-	// Register node CRUD hooks via NATS
-	plmHooks := hooks.NewPLMNodeHooks()
-	hookSubjects := nodehooks.NewSubjectBuilder(*prefix, *orgID, *deviceID, *vendor, *pluginName)
-	hookHandler := nodehooks.NewNATSHandler(plmHooks, nc, hookSubjects)
-	if err := hookHandler.RegisterAll(); err != nil {
-		logger.Fatal().Err(err).Msg("failed to register node hooks")
-	}
-	defer hookHandler.Unsubscribe()
 
 	logger.Info().Msg("PLM plugin started — product nodes ready + CRUD hooks active")
 

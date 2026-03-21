@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -13,7 +14,7 @@ func EnsureNode(ctx context.Context, client *Client, spec NodeSpec, parentID str
 	// Step 1: Query for existing node
 	filter := fmt.Sprintf(`type is "%s"`, spec.Type)
 	if parentID != "" {
-		filter += fmt.Sprintf(` and parentRef is "%s"`, parentID)
+		filter += fmt.Sprintf(` and parentId is "%s"`, parentID)
 	}
 
 	existing, err := queryNodes(ctx, client, filter)
@@ -36,8 +37,13 @@ func EnsureNode(ctx context.Context, client *Client, spec NodeSpec, parentID str
 
 // EnsureHierarchy creates service root + collection nodes (idempotent)
 func EnsureHierarchy(ctx context.Context, client *Client, spec HierarchySpec) (*HierarchyResult, error) {
-	// Step 1: Ensure service root exists
-	serviceID, err := EnsureNode(ctx, client, spec.ServiceNode, "")
+	// Validate plugin node ID is provided
+	if spec.PluginNodeID == "" {
+		return nil, fmt.Errorf("PluginNodeID is required (e.g., 'plugin_nube.plm')")
+	}
+
+	// Step 1: Ensure service root exists under plugin node
+	serviceID, err := EnsureNode(ctx, client, spec.ServiceNode, spec.PluginNodeID)
 	if err != nil {
 		return nil, fmt.Errorf("ensure service root: %w", err)
 	}
@@ -60,15 +66,31 @@ func EnsureHierarchy(ctx context.Context, client *Client, spec HierarchySpec) (*
 
 // queryNodes sends NATS query request and returns nodes
 func queryNodes(ctx context.Context, client *Client, filter string) ([]NodeResponse, error) {
-	// Query uses RAS routing: {prefix}.{orgId}.{deviceId}.query (NO flowId)
-	subject := fmt.Sprintf("%s.%s.%s.query",
-		client.Subject.(*natssubject.Builder).GetPrefix(),
-		client.Subject.(*natssubject.Builder).GetOrgID(),
-		client.Subject.(*natssubject.Builder).GetDeviceID())
+	subject := client.Subject.Build("query", "create")
 
-	reqData, err := json.Marshal(map[string]interface{}{
-		"filter": filter,
-	})
+	// Extract org and device IDs from subject builder
+	tempSubject := client.Subject.Build()
+	parts := strings.Split(tempSubject, ".")
+	if len(parts) < 5 {
+		return nil, fmt.Errorf("invalid subject format: %s", tempSubject)
+	}
+	orgID := parts[3]
+	deviceID := parts[4]
+
+	// Wrap in NATS envelope (required by gateway's NATS subscriber)
+	envelope := map[string]interface{}{
+		"method": "POST",
+		"path":   fmt.Sprintf("/api/v1/orgs/%s/devices/%s/query", orgID, deviceID),
+		"params": map[string]string{
+			"orgId":    orgID,
+			"deviceId": deviceID,
+		},
+		"body": map[string]interface{}{
+			"filter": filter,
+		},
+	}
+
+	reqData, err := json.Marshal(envelope)
 	if err != nil {
 		return nil, err
 	}
@@ -78,14 +100,19 @@ func queryNodes(ctx context.Context, client *Client, filter string) ([]NodeRespo
 		return nil, err
 	}
 
-	var result struct {
-		Data []NodeResponse `json:"data"`
+	// NATS response wraps HTTP response: {"data": {"data": [...], "meta": {...}}, "status": 200}
+	var natsResponse struct {
+		Data struct {
+			Data []NodeResponse         `json:"data"`
+			Meta map[string]interface{} `json:"meta"`
+		} `json:"data"`
+		Status int `json:"status"`
 	}
-	if err := json.Unmarshal(respData, &result); err != nil {
+	if err := json.Unmarshal(respData, &natsResponse); err != nil {
 		return nil, err
 	}
 
-	return result.Data, nil
+	return natsResponse.Data.Data, nil
 }
 
 // createNode sends NATS create request and returns node ID
@@ -101,6 +128,13 @@ func createNode(ctx context.Context, client *Client, spec NodeSpec, parentID str
 
 	if parentID != "" {
 		node["parentId"] = parentID
+		// Include parentRef in refs array (required for proper hierarchy)
+		node["refs"] = []map[string]interface{}{
+			{
+				"refName":  "parentRef",
+				"toNodeId": parentID,
+			},
+		}
 	}
 
 	// Merge description into settings if provided
@@ -111,37 +145,55 @@ func createNode(ctx context.Context, client *Client, spec NodeSpec, parentID str
 		node["settings"].(map[string]interface{})["description"] = spec.Description
 	}
 
-	reqData, err := json.Marshal(node)
+	// Get orgId and deviceId from subject builder
+	// Subject format: rubix.v1.local.{orgId}.{deviceId}.*.nodes.create
+	// Parse the base subject to extract org and device IDs
+	tempSubject := client.Subject.Build()
+	parts := strings.Split(tempSubject, ".")
+	if len(parts) < 5 {
+		return "", fmt.Errorf("invalid subject format: %s", tempSubject)
+	}
+	orgID := parts[3]
+	deviceID := parts[4]
+
+	// Wrap in NATS envelope (required by gateway's NATS subscriber)
+	envelope := map[string]interface{}{
+		"method": "POST",
+		"path":   fmt.Sprintf("/api/v1/orgs/%s/devices/%s/nodes", orgID, deviceID),
+		"params": map[string]string{
+			"orgId":    orgID,
+			"deviceId": deviceID,
+		},
+		"body": node,
+	}
+
+	reqData, err := json.Marshal(envelope)
 	if err != nil {
 		return "", err
 	}
-
-	// DEBUG: Log request
-	fmt.Printf("[BOOTSTRAP DEBUG] Creating node: type=%s, subject=%s, payload=%s\n", spec.Type, subject, string(reqData))
 
 	respData, err := client.NC.Request(subject, reqData, 5*time.Second)
 	if err != nil {
 		return "", fmt.Errorf("NATS request failed: %w", err)
 	}
 
-	// DEBUG: Log response
-	fmt.Printf("[BOOTSTRAP DEBUG] Response: %s\n", string(respData))
-
-	var result struct {
-		Data NodeResponse `json:"data"`
+	// NATS response wraps HTTP response: {"data": {"data": {...}, "meta": {...}}, "status": 201}
+	var natsResponse struct {
+		Data struct {
+			Data NodeResponse          `json:"data"`
+			Meta map[string]interface{} `json:"meta"`
+		} `json:"data"`
+		Status int `json:"status"`
 	}
-	if err := json.Unmarshal(respData, &result); err != nil {
+	if err := json.Unmarshal(respData, &natsResponse); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w (response: %s)", err, string(respData))
 	}
 
-	// DEBUG: Log parsed ID
-	fmt.Printf("[BOOTSTRAP DEBUG] Parsed ID: %s\n", result.Data.ID)
-
-	if result.Data.ID == "" {
+	if natsResponse.Data.Data.ID == "" {
 		return "", fmt.Errorf("response contained empty ID (full response: %s)", string(respData))
 	}
 
-	return result.Data.ID, nil
+	return natsResponse.Data.Data.ID, nil
 }
 
 // NodeResponse matches the node structure returned by NATS API

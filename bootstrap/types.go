@@ -21,8 +21,9 @@ type NodeSpec struct {
 
 // HierarchySpec defines a complete service + collections hierarchy
 type HierarchySpec struct {
-	ServiceNode NodeSpec
-	Collections []NodeSpec
+	PluginNodeID string     // ID of the plugin node (parent for service root, e.g., "plugin_nube.plm")
+	ServiceNode  NodeSpec   // Service root node spec
+	Collections  []NodeSpec // Collection nodes under service
 }
 
 // HierarchyResult contains the IDs of created nodes
